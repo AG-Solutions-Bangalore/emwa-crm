@@ -1,0 +1,132 @@
+import React from 'react';
+import { X, MessageSquare, Clock } from 'lucide-react';
+
+function formatDate(dateStr) {
+  if (!dateStr) return 'N/A';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return String(dateStr);
+  return d.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function getStatusBadge(status) {
+  const s = String(status || '').toLowerCase();
+  if (s === 'completed') {
+    return 'bg-[#EDF7EE] text-[#1E6B34] border-[#C6E6CC]';
+  }
+  if (s === 'processing') {
+    return 'bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]';
+  }
+  if (s === 'cancel' || s === 'cancelled') {
+    return 'bg-[#FDF0F0] text-[#9A2D2D] border-[#F6C8C8]';
+  }
+  return 'bg-[#FEF6E9] text-[#9A6218] border-[#FAD8A5]';
+}
+
+export default function EnquiryDetailsModal({ isOpen, onClose, enquiry, loading }) {
+  if (!isOpen) return null;
+
+  const status = enquiry?.enquiryStatus || enquiry?.enquiry_status || enquiry?.status || 'Pending';
+  const name = enquiry?.enquiryFullName || enquiry?.full_name || enquiry?.name || 'N/A';
+  const mobile = enquiry?.enquiryMobile || enquiry?.mobile || 'N/A';
+  const email = enquiry?.enquiryEmail || enquiry?.email || 'N/A';
+  const message = enquiry?.enquiryMessage || enquiry?.message || 'No additional message.';
+  const occasion = enquiry?.occasion || enquiry?.occasion_name || enquiry?.enquiryOccasion || 'N/A';
+  const weddingDate = enquiry?.enquiryWeddingDate || enquiry?.wedding_date || enquiry?.weddingDate;
+  const createdAt = enquiry?.created_at || enquiry?.createdDate || enquiry?.enquiryCreatedDate;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
+      <div className="w-full max-w-lg rounded-2xl border border-[#E8E3DA] bg-[#FCFBFA] p-6 sm:p-7 shadow-2xl relative">
+        
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 p-1.5 rounded-full text-[#8C8275] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="flex items-center gap-3.5 mb-6 pb-4 border-b border-[#E8E3DA]">
+          <div className="h-10 w-10 rounded-xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center">
+            <MessageSquare className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="font-display text-lg font-bold text-[#1A1817] tracking-tight">
+              Enquiry #{enquiry?.id || ''}
+            </h3>
+            <span className={`inline-block px-3 py-0.5 rounded-full text-xs font-medium border mt-1 ${getStatusBadge(status)}`}>
+              {status}
+            </span>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="py-12 text-center text-[#78716C]">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#1A1817] border-t-transparent mx-auto mb-2" />
+            <span className="text-xs">Fetching enquiry details...</span>
+          </div>
+        ) : (
+          <div className="space-y-4 text-xs">
+            <div className="grid grid-cols-2 gap-3.5">
+              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Customer Name</span>
+                <span className="font-semibold text-[#1A1817] text-sm">{name}</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Mobile</span>
+                <span className="font-semibold text-[#1A1817] text-sm">{mobile}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3.5">
+              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Email</span>
+                <span className="font-semibold text-[#1A1817] text-sm break-all">{email}</span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Occasion / Event</span>
+                <span className="font-semibold text-[#1A1817] text-sm">{occasion}</span>
+              </div>
+            </div>
+
+            {weddingDate && (
+              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Event / Wedding Date</span>
+                <span className="font-semibold text-[#1A1817] text-sm">{formatDate(weddingDate)}</span>
+              </div>
+            )}
+
+            <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+              <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Customer Message</span>
+              <p className="text-[#3D372E] text-sm leading-relaxed whitespace-pre-wrap">{message}</p>
+            </div>
+
+            {createdAt && (
+              <div className="flex items-center gap-1.5 text-[#8C8275] text-xs pt-1">
+                <Clock className="h-3.5 w-3.5" />
+                <span>Submitted on {formatDate(createdAt)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-7 pt-4 border-t border-[#E8E3DA] flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl border border-[#DDD7CD] bg-[#FAF8F5] hover:bg-[#EFECE6] text-xs font-medium text-[#4A443D] transition cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
