@@ -41,13 +41,13 @@ export default function Pagination({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-[#FAF8F5] border-t border-[#E8E3DA] text-xs text-[#78716C]">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 bg-[#0D0F18]/90 border-t border-[#1F2438] text-xs text-[#94A3B8]">
       
       {/* Entry counter text */}
       <div>
-        Showing <span className="font-semibold text-[#1A1817]">{startEntry}</span> to{' '}
-        <span className="font-semibold text-[#1A1817]">{endEntry}</span> of{' '}
-        <span className="font-semibold text-[#1A1817]">{totalCount}</span> entries
+        Showing <span className="font-semibold text-[#00F0FF]">{startEntry}</span> to{' '}
+        <span className="font-semibold text-[#00F0FF]">{endEntry}</span> of{' '}
+        <span className="font-semibold text-white">{totalCount}</span> entries
       </div>
 
       {/* Pagination Controls */}
@@ -57,7 +57,7 @@ export default function Pagination({
           onClick={() => onPageChange(1)}
           disabled={currentPage <= 1}
           title="First Page"
-          className="p-1.5 rounded-lg border border-[#E2DDD5] bg-white text-[#4A443D] hover:bg-[#EFECE6] disabled:opacity-30 disabled:hover:bg-white transition cursor-pointer"
+          className="p-1.5 rounded-lg border border-[#1F2438] bg-[#121522] text-[#94A3B8] hover:text-white hover:border-[#8B5CF6]/50 hover:bg-[#1A1F33] disabled:opacity-30 disabled:hover:bg-[#121522] transition cursor-pointer"
         >
           <ChevronsLeft className="h-3.5 w-3.5" />
         </button>
@@ -67,7 +67,7 @@ export default function Pagination({
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
           title="Previous Page"
-          className="p-1.5 rounded-lg border border-[#E2DDD5] bg-white text-[#4A443D] hover:bg-[#EFECE6] disabled:opacity-30 disabled:hover:bg-white transition cursor-pointer"
+          className="p-1.5 rounded-lg border border-[#1F2438] bg-[#121522] text-[#94A3B8] hover:text-white hover:border-[#8B5CF6]/50 hover:bg-[#1A1F33] disabled:opacity-30 disabled:hover:bg-[#121522] transition cursor-pointer"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
         </button>
@@ -76,7 +76,7 @@ export default function Pagination({
         {getPageNumbers().map((num, idx) => {
           if (num === '...') {
             return (
-              <span key={`dots-${idx}`} className="px-1.5 text-xs text-[#9C9488]">
+              <span key={`dots-${idx}`} className="px-1.5 text-xs text-[#64748B]">
                 ...
               </span>
             );
@@ -89,8 +89,8 @@ export default function Pagination({
               onClick={() => onPageChange(num)}
               className={`min-w-[28px] h-7 px-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 isActive
-                  ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
-                  : 'text-[#4A443D] hover:bg-[#EFECE6] bg-white border border-[#E2DDD5]'
+                  ? 'bg-gradient-to-r from-[#8B5CF6] to-[#06B6D4] text-white shadow-[0_0_12px_rgba(6,182,212,0.4)] border border-[#00F0FF]/40'
+                  : 'text-[#94A3B8] hover:text-white hover:bg-[#1A1F33] bg-[#121522] border border-[#1F2438]'
               }`}
             >
               {num}
@@ -103,7 +103,7 @@ export default function Pagination({
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
           title="Next Page"
-          className="p-1.5 rounded-lg border border-[#E2DDD5] bg-white text-[#4A443D] hover:bg-[#EFECE6] disabled:opacity-30 disabled:hover:bg-white transition cursor-pointer"
+          className="p-1.5 rounded-lg border border-[#1F2438] bg-[#121522] text-[#94A3B8] hover:text-white hover:border-[#8B5CF6]/50 hover:bg-[#1A1F33] disabled:opacity-30 disabled:hover:bg-[#121522] transition cursor-pointer"
         >
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
@@ -113,7 +113,7 @@ export default function Pagination({
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage >= totalPages}
           title="Last Page"
-          className="p-1.5 rounded-lg border border-[#E2DDD5] bg-white text-[#4A443D] hover:bg-[#EFECE6] disabled:opacity-30 disabled:hover:bg-white transition cursor-pointer"
+          className="p-1.5 rounded-lg border border-[#1F2438] bg-[#121522] text-[#94A3B8] hover:text-white hover:border-[#8B5CF6]/50 hover:bg-[#1A1F33] disabled:opacity-30 disabled:hover:bg-[#121522] transition cursor-pointer"
         >
           <ChevronsRight className="h-3.5 w-3.5" />
         </button>

@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, Image, Sparkles, Upload, FileText, Globe, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Save, Sparkles, Upload, FileText, ChevronRight, ChevronLeft } from 'lucide-react';
 import { getActiveCategories } from '../../services/categoryApi';
+import RichTextEditor from '../common/RichTextEditor';
+import toast from 'react-hot-toast';
 
 function slugify(text) {
   return String(text || '')
@@ -11,6 +13,21 @@ function slugify(text) {
     .replace(/^-+|-+$/g, '');
 }
 
+function resolveImageUrl(url, baseUrl = 'https://easemarketing.in/emwaapi/public/assets/images/blog_images/') {
+  if (!url) return null;
+  if (url.startsWith('blob:') || url.startsWith('data:')) {
+    return url;
+  }
+  let resolved = url;
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    const cleanUrl = url.startsWith('/') ? url.slice(1) : url;
+    resolved = `${cleanBase}${cleanUrl}`;
+  }
+  const sep = resolved.includes('?') ? '&' : '?';
+  return `${resolved}${sep}t=${Date.now()}`;
+}
+
 export default function BlogModal({
   isOpen,
   onClose,
@@ -19,13 +36,21 @@ export default function BlogModal({
   setForm,
   editingId,
   submitting,
+  imageBaseUrl = 'https://easemarketing.in/emwaapi/public/assets/images/blog_images/',
 }) {
   const [categories, setCategories] = useState([]);
   const [activeTab, setActiveTab] = useState('general');
   const [previewImage, setPreviewImage] = useState(null);
+  const [errors, setErrors] = useState({});
+
+  const titleInputRef = useRef(null);
+  const slugInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
+      setActiveTab('general');
+      setErrors({});
+
       // Fetch active categories for dropdown
       getActiveCategories()
         .then((res) => {
@@ -33,20 +58,41 @@ export default function BlogModal({
           if (Array.isArray(list)) setCategories(list);
         })
         .catch(() => {});
-      
-      // Set existing image preview if editing
-      if (form.banner_image_url) {
-        setPreviewImage(form.banner_image_url);
-      } else {
-        setPreviewImage(null);
-      }
+
+      // Auto focus required field on open
+      const timer = setTimeout(() => {
+        if (!form.blog_title || !form.blog_title.trim()) {
+          titleInputRef.current?.focus();
+        } else if (!form.blog_slug || !form.blog_slug.trim()) {
+          slugInputRef.current?.focus();
+        } else {
+          titleInputRef.current?.focus();
+        }
+      }, 150);
+
+      return () => clearTimeout(timer);
     }
-  }, [isOpen, form.banner_image_url]);
+  }, [isOpen]);
+
+  // Sync preview image whenever form banner image changes
+  useEffect(() => {
+    if (form.blog_banner_image instanceof File) {
+      setPreviewImage(URL.createObjectURL(form.blog_banner_image));
+    } else if (form.banner_image_url) {
+      setPreviewImage(resolveImageUrl(form.banner_image_url, imageBaseUrl));
+    } else {
+      setPreviewImage(null);
+    }
+  }, [form.blog_banner_image, form.banner_image_url, imageBaseUrl]);
 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: false }));
+    }
+
     if (type === 'checkbox') {
       setForm((prev) => ({ ...prev, [name]: checked ? '1' : '0' }));
     } else {
@@ -64,7 +110,12 @@ export default function BlogModal({
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      setForm((prev) => ({ ...prev, blog_banner_image: file }));
+      setForm((prev) => ({
+        ...prev,
+        blog_banner_image: file,
+        banner_image: file,
+        image: file,
+      }));
       setPreviewImage(URL.createObjectURL(file));
     }
   };
@@ -75,16 +126,80 @@ export default function BlogModal({
       blog_slug: slugify(prev.blog_title || ''),
       manualSlug: true,
     }));
+    if (errors.blog_slug) {
+      setErrors((prev) => ({ ...prev, blog_slug: false }));
+    }
+  };
+
+  const validateRequiredFields = () => {
+    if (!form.blog_title || !form.blog_title.trim()) {
+      setErrors((prev) => ({ ...prev, blog_title: true }));
+      setActiveTab('general');
+      toast.error('Article Title is required.');
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 100);
+      return false;
+    }
+
+    if (!form.blog_slug || !form.blog_slug.trim()) {
+      setErrors((prev) => ({ ...prev, blog_slug: true }));
+      setActiveTab('general');
+      toast.error('URL Slug is required.');
+      setTimeout(() => {
+        slugInputRef.current?.focus();
+      }, 100);
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleNext = () => {
+    if (activeTab === 'general') {
+      if (!validateRequiredFields()) return;
+      setActiveTab('media');
+    } else if (activeTab === 'media') {
+      setActiveTab('seo');
+    }
+  };
+
+  const handlePrev = () => {
+    if (activeTab === 'seo') {
+      setActiveTab('media');
+    } else if (activeTab === 'media') {
+      setActiveTab('general');
+    }
+  };
+
+  const handleTabClick = (tab) => {
+    if (tab === 'media' || tab === 'seo') {
+      if (!validateRequiredFields()) return;
+    }
+    setActiveTab(tab);
+  };
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    if (!validateRequiredFields()) {
+      return;
+    }
+    onSubmit(e);
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
-      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-[#E8E3DA] bg-[#FCFBFA] shadow-2xl relative overflow-hidden">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in overflow-y-auto"
+    >
+      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-[#E8E3DA] bg-[#FCFBFA] shadow-2xl relative my-auto overflow-hidden">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E3DA] bg-[#FAF8F5]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E3DA] bg-[#FAF8F5] rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center">
+            <div className="h-9 w-9 rounded-xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center flex-shrink-0">
               <FileText className="h-4 w-4" />
             </div>
             <div>
@@ -98,18 +213,20 @@ export default function BlogModal({
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full text-[#8C8275] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
+            aria-label="Close modal"
+            className="p-2 rounded-xl text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] border border-[#E2DDD5] bg-white transition cursor-pointer shadow-2xs flex-shrink-0"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Modal Nav Tabs */}
-        <div className="flex items-center gap-2 px-6 pt-3 border-b border-[#E8E3DA] bg-[#FAF8F5]/50">
+        <div className="flex items-center gap-2 px-6 pt-3 border-b border-[#E8E3DA] bg-[#FAF8F5]/50 flex-shrink-0">
           <button
             type="button"
-            onClick={() => setActiveTab('general')}
+            onClick={() => handleTabClick('general')}
             className={`pb-2.5 px-3 text-xs font-medium transition cursor-pointer border-b-2 ${
               activeTab === 'general'
                 ? 'border-[#1A1817] text-[#1A1817] font-semibold'
@@ -120,7 +237,7 @@ export default function BlogModal({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('media')}
+            onClick={() => handleTabClick('media')}
             className={`pb-2.5 px-3 text-xs font-medium transition cursor-pointer border-b-2 ${
               activeTab === 'media'
                 ? 'border-[#1A1817] text-[#1A1817] font-semibold'
@@ -131,7 +248,7 @@ export default function BlogModal({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('seo')}
+            onClick={() => handleTabClick('seo')}
             className={`pb-2.5 px-3 text-xs font-medium transition cursor-pointer border-b-2 ${
               activeTab === 'seo'
                 ? 'border-[#1A1817] text-[#1A1817] font-semibold'
@@ -143,7 +260,8 @@ export default function BlogModal({
         </div>
 
         {/* Form Body with Scroll */}
-        <form onSubmit={onSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+        <form onSubmit={handleFormSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
           
           {/* TAB 1: GENERAL & CONTENT */}
           {activeTab === 'general' && (
@@ -153,14 +271,19 @@ export default function BlogModal({
                   Article Title <span className="text-[#9A2D2D]">*</span>
                 </label>
                 <input
+                  ref={titleInputRef}
                   type="text"
                   name="blog_title"
                   value={form.blog_title || ''}
                   onChange={handleChange}
                   placeholder="e.g. Top 10 Luxury Wedding Card Trends of 2026..."
-                  required
-                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs"
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${
+                    errors.blog_title ? 'border-[#E05252] bg-[#FFF5F5] ring-1 ring-[#E05252]' : 'border-[#E2DDD5] bg-[#FAF8F5]'
+                  } text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs`}
                 />
+                {errors.blog_title && (
+                  <p className="mt-1 text-xs text-[#E05252]">Article title is required.</p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -179,14 +302,19 @@ export default function BlogModal({
                     </button>
                   </div>
                   <input
+                    ref={slugInputRef}
                     type="text"
                     name="blog_slug"
                     value={form.blog_slug || ''}
                     onChange={handleChange}
                     placeholder="top-10-luxury-wedding-cards..."
-                    required
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs font-mono"
+                    className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${
+                      errors.blog_slug ? 'border-[#E05252] bg-[#FFF5F5] ring-1 ring-[#E05252]' : 'border-[#E2DDD5] bg-[#FAF8F5]'
+                    } text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs font-mono`}
                   />
+                  {errors.blog_slug && (
+                    <p className="mt-1 text-xs text-[#E05252]">URL slug is required.</p>
+                  )}
                 </div>
 
                 <div>
@@ -231,13 +359,13 @@ export default function BlogModal({
                 <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
                   Full Article Body
                 </label>
-                <textarea
-                  name="blog_description"
-                  rows={6}
+                <RichTextEditor
                   value={form.blog_description || ''}
-                  onChange={handleChange}
-                  placeholder="Write the full content of your blog post here..."
-                  className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs leading-relaxed"
+                  onChange={(htmlContent) => {
+                    setForm((prev) => ({ ...prev, blog_description: htmlContent }));
+                  }}
+                  placeholder="Write and format the full content of your blog post here..."
+                  minHeight="250px"
                 />
               </div>
             </div>
@@ -378,29 +506,55 @@ export default function BlogModal({
             </div>
           )}
 
-          {/* Modal Footer */}
-          <div className="pt-4 border-t border-[#E8E3DA] flex items-center justify-between">
+          </div>
+
+          {/* Sticky Modal Footer */}
+          <div className="px-6 py-3.5 bg-[#FAF8F5] border-t border-[#E8E3DA] flex items-center justify-between rounded-b-2xl flex-shrink-0">
+            {/* Steps Progress Indicator */}
             <div className="flex items-center gap-2">
               {['general', 'media', 'seo'].map((tab) => (
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={`h-2 w-7 rounded-full transition-all ${
-                    activeTab === tab ? 'bg-[#1A1817]' : 'bg-[#E2DDD5]'
+                  onClick={() => handleTabClick(tab)}
+                  className={`h-2 w-7 rounded-full transition-all cursor-pointer ${
+                    activeTab === tab ? 'bg-[#1A1817]' : 'bg-[#E2DDD5] hover:bg-[#CDC6BA]'
                   }`}
                 />
               ))}
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Navigation & Action Buttons */}
+            <div className="flex items-center gap-2.5">
+              {activeTab !== 'general' && (
+                <button
+                  type="button"
+                  onClick={handlePrev}
+                  className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#F2EFEB] text-xs font-semibold text-[#4A443D] transition cursor-pointer shadow-2xs"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  <span>Back</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#F2EFEB] text-xs font-medium text-[#4A443D] transition cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#F2EFEB] text-xs font-medium text-[#4A443D] transition cursor-pointer shadow-2xs"
               >
                 Cancel
               </button>
+
+              {activeTab !== 'seo' && (
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] hover:bg-[#EFECE6] text-xs font-semibold text-[#1A1817] transition cursor-pointer shadow-2xs"
+                >
+                  <span>Next Step</span>
+                  <ChevronRight className="h-3.5 w-3.5 text-[#C99C4B]" />
+                </button>
+              )}
 
               <button
                 type="submit"

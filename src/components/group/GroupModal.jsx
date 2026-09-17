@@ -1,7 +1,7 @@
 import React from 'react';
-import { X, Layers, Save } from 'lucide-react';
+import { X, Boxes, Save } from 'lucide-react';
 
-export default function CategoryModal({
+export default function GroupModal({
   isOpen,
   onClose,
   onSubmit,
@@ -25,19 +25,18 @@ export default function CategoryModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E3DA] bg-[#FAF8F5] rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center flex-shrink-0">
-              <Layers className="h-5 w-5" />
+              <Boxes className="h-5 w-5" />
             </div>
             <div>
               <h3 className="font-display text-base sm:text-lg font-bold text-[#1A1817] tracking-tight">
-                {editingId ? 'Edit Category' : 'Create New Category'}
+                {editingId ? 'Edit Product Group' : 'Create Product Group'}
               </h3>
               <p className="text-xs text-[#78716C]">
-                {editingId ? 'Update category details and status' : 'Add a new catalog category'}
+                {editingId ? 'Update group name and visibility status' : 'Add a new product grouping to organize catalog'}
               </p>
             </div>
           </div>
 
-          {/* Prominent Close Button */}
           <button
             type="button"
             onClick={onClose}
@@ -48,19 +47,18 @@ export default function CategoryModal({
           </button>
         </div>
 
-        {/* Scrollable Form Body */}
         <form onSubmit={onSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="p-6 overflow-y-auto space-y-4 flex-1">
             <div>
               <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                Category Name <span className="text-[#9A2D2D]">*</span>
+                Group Name <span className="text-[#9A2D2D]">*</span>
               </label>
               <input
                 type="text"
-                name="category_name"
-                value={form.category_name}
+                name="group_name"
+                value={form.group_name || ''}
                 onChange={onChange}
-                placeholder="Enter category name (e.g. Wedding Cards, Business Cards)"
+                placeholder="e.g. Laser Cut Cards, Scroll Invites, Acrylic Collection..."
                 required
                 className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs"
               />
@@ -69,11 +67,11 @@ export default function CategoryModal({
             {editingId && (
               <div>
                 <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                  Category Status
+                  Group Status
                 </label>
                 <select
-                  name="category_status"
-                  value={form.category_status}
+                  name="group_status"
+                  value={form.group_status || 'Active'}
                   onChange={onChange}
                   className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs cursor-pointer"
                 >
@@ -89,7 +87,7 @@ export default function CategoryModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-xs font-medium text-[#4A443D] transition cursor-pointer"
+              className="px-4 py-2 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-xs font-medium text-[#4A443D] transition cursor-pointer shadow-2xs"
             >
               Cancel
             </button>
@@ -100,7 +98,7 @@ export default function CategoryModal({
               className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-xs font-semibold shadow-xs transition active:scale-95 disabled:bg-[#A39C91] cursor-pointer"
             >
               <Save className="h-3.5 w-3.5 text-[#C99C4B]" />
-              <span>{submitting ? 'Saving...' : editingId ? 'Update Category' : 'Create Category'}</span>
+              <span>{submitting ? 'Saving...' : editingId ? 'Update Group' : 'Create Group'}</span>
             </button>
           </div>
         </form>
@@ -109,4 +107,3 @@ export default function CategoryModal({
     </div>
   );
 }
-
