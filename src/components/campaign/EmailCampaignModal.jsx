@@ -420,7 +420,7 @@ export default function EmailCampaignModal({
                 <span>Saving...</span>
               </>
             ) : (
-              <span>{isEditing ? 'Save Changes' : 'Create Campaign'}</span>
+              <span>{isEditing ? 'Save Changes' : 'Create Email Campaign'}</span>
             )}
           </button>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Mail, Calendar, Users, FileText, CheckCircle2, ShieldAlert, Trash2, Loader2, Sparkles, Send } from 'lucide-react';
+import { X, Mail, Calendar, Users, FileText, CheckCircle2, ShieldAlert, Trash2, Loader2, Sparkles, Send, Clock } from 'lucide-react';
 import { deleteEmailCampaignSub } from '../../services/emailCampaignApi';
 import toast from 'react-hot-toast';
 
@@ -40,7 +40,7 @@ export default function EmailCampaignViewModal({
     }
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-[#F3EFE6] px-2.5 py-1 text-xs font-semibold text-[#6E5D4B]">
-        <ClockIcon className="h-3 w-3" /> Pending
+        <Clock className="h-3 w-3" /> Pending
       </span>
     );
   };

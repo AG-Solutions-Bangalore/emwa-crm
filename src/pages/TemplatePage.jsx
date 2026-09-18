@@ -4,6 +4,9 @@ import Header from '../components/layout/Header';
 import TemplateModal from '../components/template/TemplateModal';
 import TemplatePreviewModal from '../components/template/TemplatePreviewModal';
 import Pagination from '../components/common/Pagination';
+import StatusFilterToggle from '../components/common/StatusFilterToggle';
+import StatsSummaryBar from '../components/common/StatsSummaryBar';
+import useDebounce from '../hooks/useDebounce';
 import {
   getTemplates,
   getTemplateById,
@@ -54,6 +57,8 @@ export default function TemplatePage() {
   const [typeFilter, setTypeFilter] = useState('All'); // 'All' | 'Email' | 'WhatsApp'
   const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Active' | 'Inactive'
 
+  const debouncedSearch = useDebounce(searchQuery, 350);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -73,14 +78,14 @@ export default function TemplatePage() {
   const [previewItem, setPreviewItem] = useState(null);
 
   /* ── 1. GET /template with pagination ── */
-  const fetchTemplateList = async (page = currentPage, query = searchQuery, type = typeFilter, status = statusFilter) => {
+  const fetchTemplateList = async (page = currentPage, query = debouncedSearch, type = typeFilter, status = statusFilter) => {
     setLoading(true);
     try {
       const params = {
         page,
         ...(query.trim() ? { search: query.trim(), q: query.trim() } : {}),
         ...(type !== 'All' ? { template_type: type, type } : {}),
-        ...(status !== 'All' ? { status } : {}),
+        ...(status !== 'All' ? { status, template_status: status } : {}),
       };
 
       const res = await getTemplates(params);
@@ -142,8 +147,8 @@ export default function TemplatePage() {
   };
 
   useEffect(() => {
-    fetchTemplateList(currentPage, searchQuery, typeFilter, statusFilter);
-  }, [currentPage, typeFilter, statusFilter]);
+    fetchTemplateList(currentPage, debouncedSearch, typeFilter, statusFilter);
+  }, [currentPage, debouncedSearch, typeFilter, statusFilter]);
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
@@ -154,7 +159,7 @@ export default function TemplatePage() {
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
       setCurrentPage(newPage);
-      fetchTemplateList(newPage, searchQuery, typeFilter, statusFilter);
+      fetchTemplateList(newPage, debouncedSearch, typeFilter, statusFilter);
     }
   };
 
@@ -273,48 +278,44 @@ export default function TemplatePage() {
   };
 
   // Metrics
-  const stats = useMemo(() => {
+  const templateStats = useMemo(() => {
     const total = totalCount || items.length;
     let emailCount = 0;
     let whatsappCount = 0;
-    let activeCount = 0;
 
     items.forEach((it) => {
-      const type = it.template_type || it.type || 'Email';
-      if (type === 'Email') emailCount++;
-      else if (type === 'WhatsApp') whatsappCount++;
-      const st = it.template_status || it.status || 'Active';
-      if (st === 'Active') activeCount++;
+      const type = (it.template_type || it.type || 'Email').toLowerCase();
+      if (type === 'email') emailCount++;
+      else if (type === 'whatsapp') whatsappCount++;
     });
 
-    return { total, emailCount, whatsappCount, activeCount };
+    return [
+      {
+        label: 'Total Templates',
+        value: total,
+        icon: LayoutTemplate,
+        color: 'amber',
+        filterValue: 'All',
+        subtext: 'Configured message templates',
+      },
+      {
+        label: 'Email Templates',
+        value: emailCount,
+        icon: Mail,
+        color: 'blue',
+        filterValue: 'Email',
+        subtext: 'Rich HTML newsletter layouts',
+      },
+      {
+        label: 'WhatsApp Templates',
+        value: whatsappCount,
+        icon: MessageSquare,
+        color: 'emerald',
+        filterValue: 'WhatsApp',
+        subtext: 'Direct instant message drafts',
+      },
+    ];
   }, [items, totalCount]);
-
-  // Client-side filtering fallback to ensure filters always work accurately
-  const displayItems = useMemo(() => {
-    return items.filter((item) => {
-      const type = item.template_type || item.type || 'Email';
-      if (typeFilter !== 'All' && type.toLowerCase() !== typeFilter.toLowerCase()) {
-        return false;
-      }
-
-      const status = item.template_status || item.status || 'Active';
-      if (statusFilter !== 'All' && status.toLowerCase() !== statusFilter.toLowerCase()) {
-        return false;
-      }
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const name = String(item.template_name || item.name || '').toLowerCase();
-        const templateId = String(item.template_id || item.id || '').toLowerCase();
-        if (!name.includes(q) && !templateId.includes(q)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [items, typeFilter, statusFilter, searchQuery]);
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F0] text-[#1A1817]">
@@ -323,145 +324,86 @@ export default function TemplatePage() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header title="Template Library" />
 
-        <main className="flex-1 p-5 md:p-7 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-5 md:p-6 max-w-7xl w-full">
           
-          {/* Top Banner */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Header Bar */}
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FAF8F5] border border-[#E8E3DA] text-[#9E7432] shadow-2xs">
-                  <LayoutTemplate className="h-4 w-4" />
-                </span>
-                <h2 className="font-serif text-2xl font-bold text-[#1A1817] tracking-tight">
-                  Campaign Templates
-                </h2>
-              </div>
-              <p className="text-xs text-[#7A7369] mt-1">
-                Manage reusable Email HTML designs and WhatsApp messaging templates.
+              <h1 className="text-sm md:text-base font-semibold text-[#1A1817] tracking-tight">
+                Campaign Templates
+              </h1>
+              <p className="text-xs text-[#78716C] mt-0.5">
+                Manage reusable Email HTML designs and WhatsApp messaging templates
               </p>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => fetchTemplateList(currentPage, searchQuery, typeFilter, statusFilter)}
-                title="Refresh templates"
-                className="p-2.5 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#E2DDD5] bg-white hover:bg-[#F7F4EE] text-[11px] font-medium text-[#4A443D] shadow-2xs transition-all cursor-pointer"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#9E7432]' : ''}`} />
+                <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
               </button>
 
               <button
                 onClick={handleOpenCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
-                <Plus className="h-4 w-4 text-[#C99C4B]" />
-                <span>Create Template</span>
+                <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
+                <span>Add Template</span>
               </button>
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Total Templates</p>
-                <h3 className="text-xl font-bold text-[#1A1817] mt-0.5">{stats.total}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center">
-                <Layers className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Email HTML</p>
-                <h3 className="text-xl font-bold text-[#9E7432] mt-0.5">{stats.emailCount}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#FAF8F5] text-[#9E7432] border border-[#E8E3DA] flex items-center justify-center">
-                <Mail className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">WhatsApp</p>
-                <h3 className="text-xl font-bold text-[#1E7E34] mt-0.5">{stats.whatsappCount}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB] flex items-center justify-center">
-                <MessageSquare className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Active (Live)</p>
-                <h3 className="text-xl font-bold text-[#1A1817] mt-0.5">{stats.activeCount}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#F5EFE3] text-[#78716C] border border-[#E8E3DA] flex items-center justify-center">
-                <CheckCircle2 className="h-4 w-4" />
-              </div>
-            </div>
-          </div>
+          {/* Unique Stats Summary Cards */}
+          <StatsSummaryBar
+            stats={templateStats}
+            activeFilter={typeFilter}
+            onSelectFilter={(filter) => {
+              setTypeFilter(filter);
+              setCurrentPage(1);
+            }}
+          />
 
           {/* Search & Filter Toolbar */}
-          <div className="bg-white p-3.5 rounded-xl border border-[#E8E3DA] shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
-            <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9C9488]" />
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full sm:w-72">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9C9488] pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search templates by name or ID..."
-                className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs"
+                placeholder="Search templates by name..."
+                className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
 
-            <div className="flex items-center justify-between sm:justify-end gap-2.5">
-              
+            <div className="flex items-center gap-2.5 self-end sm:self-auto">
               {/* Type Filter */}
-              <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5">
-                {['All', 'Email', 'WhatsApp'].map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => {
-                      setTypeFilter(type);
-                      setCurrentPage(1);
-                    }}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
-                      typeFilter === type
-                        ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
-                        : 'text-[#5C554B] hover:text-[#1A1817]'
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
+              <StatusFilterToggle
+                label="Type:"
+                options={['All', 'Email', 'WhatsApp']}
+                value={typeFilter}
+                onChange={(val) => {
+                  setTypeFilter(val);
+                  setCurrentPage(1);
+                }}
+              />
 
               {/* Status Filter */}
-              <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5">
-                {['All', 'Active', 'Inactive'].map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => {
-                      setStatusFilter(status);
-                      setCurrentPage(1);
-                    }}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
-                      statusFilter === status
-                        ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
-                        : 'text-[#5C554B] hover:text-[#1A1817]'
-                    }`}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-
+              <StatusFilterToggle
+                options={['All', 'Active', 'Inactive']}
+                value={statusFilter}
+                onChange={(val) => {
+                  setStatusFilter(val);
+                  setCurrentPage(1);
+                }}
+              />
             </div>
+
           </div>
 
           {/* Templates Table View */}
@@ -470,7 +412,7 @@ export default function TemplatePage() {
               <RefreshCw className="h-7 w-7 animate-spin text-[#9E7432] mx-auto mb-3" />
               <p className="text-xs font-medium text-[#78716C]">Loading templates...</p>
             </div>
-          ) : displayItems.length === 0 ? (
+          ) : items.length === 0 ? (
             <div className="bg-white rounded-2xl border border-[#E8E3DA] p-14 text-center shadow-2xs">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] mb-4">
                 <LayoutTemplate className="h-7 w-7" />
@@ -505,7 +447,7 @@ export default function TemplatePage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F0ECE3]">
-                    {displayItems.map((item, index) => {
+                    {items.map((item, index) => {
                       const id = item.id;
                       const name = item.template_name || item.name || 'Untitled Template';
                       const type = item.template_type || 'Email';

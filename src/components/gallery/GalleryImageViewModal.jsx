@@ -23,7 +23,7 @@ export default function GalleryImageViewModal({
 
   const status = item.gallery_status || item.status || 'Active';
   const isActive = status === 'Active';
-  const createdDate = item.created_at || item.createdDate || item.date;
+  const createdDate = item.created_at || item.createdDate || item.created_date || item.date || item.gallery_date || item.createdAt || item.updated_at || item.updatedAt || item.gallery_created_at || item.timestamp;
 
   return (
     <div

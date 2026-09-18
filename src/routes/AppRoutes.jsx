@@ -19,6 +19,7 @@ import TemplatePage from '../pages/TemplatePage';
 import PipelinePage from '../pages/PipelinePage';
 import WhatsAppCampaignPage from '../pages/WhatsAppCampaignPage';
 import EmailCampaignPage from '../pages/EmailCampaignPage';
+import CompanyPage from '../pages/CompanyPage';
 import AuthRoute from './AuthRoute';
 import ProtectedRoute from './ProtectedRoute';
 
@@ -33,8 +34,9 @@ export default function AppRoutes() {
 
       {/* Protected Routes (Require Token) */}
       <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<Navigate to="/category" replace />} />
-        {/* <Route path="/" element={<DashboardPage />} /> */}
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/company" element={<CompanyPage />} />
         <Route path="/category" element={<CategoryPage />} />
         <Route path="/group" element={<GroupPage />} />
         <Route path="/contact" element={<ContactPage />} />
