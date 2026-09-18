@@ -4,6 +4,9 @@ import Header from '../components/layout/Header';
 import HolidayModal from '../components/holiday/HolidayModal';
 import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import Pagination from '../components/common/Pagination';
+import StatusFilterToggle from '../components/common/StatusFilterToggle';
+import StatsSummaryBar from '../components/common/StatsSummaryBar';
+import useDebounce from '../hooks/useDebounce';
 import {
   getHolidays,
   getHolidayById,
@@ -82,6 +85,8 @@ export default function HolidayPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPeriod, setFilterPeriod] = useState('All'); // 'All' | 'Upcoming' | 'Past'
 
+  const debouncedSearch = useDebounce(searchQuery, 350);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -102,7 +107,7 @@ export default function HolidayPage() {
   const [deleting, setDeleting] = useState(false);
 
   /* ── 1. GET /holiday with pagination ── */
-  const fetchHolidayList = async (page = currentPage, query = searchQuery) => {
+  const fetchHolidayList = async (page = currentPage, query = debouncedSearch) => {
     setLoading(true);
     try {
       const params = {
@@ -136,8 +141,8 @@ export default function HolidayPage() {
   };
 
   useEffect(() => {
-    fetchHolidayList(currentPage, searchQuery);
-  }, [currentPage]);
+    fetchHolidayList(currentPage, debouncedSearch);
+  }, [currentPage, debouncedSearch]);
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
@@ -244,26 +249,43 @@ export default function HolidayPage() {
   };
 
   // Metrics
-  const stats = useMemo(() => {
+  const holidayStats = useMemo(() => {
     const total = totalCount || items.length;
     let upcoming = 0;
     let past = 0;
-    let currentMonth = 0;
-    const now = new Date();
 
     items.forEach((it) => {
-      const d = parseHolidayDate(it.holiday_date || it.date);
-      if (d) {
-        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
-          currentMonth++;
-        }
-        const status = getDateStatus(it.holiday_date || it.date);
-        if (status === 'upcoming' || status === 'today') upcoming++;
-        else past++;
-      }
+      const status = getDateStatus(it.holiday_date || it.date);
+      if (status === 'upcoming' || status === 'today') upcoming++;
+      else past++;
     });
 
-    return { total, upcoming, past, currentMonth };
+    return [
+      {
+        label: 'Total Holidays',
+        value: total,
+        icon: CalendarDays,
+        color: 'amber',
+        filterValue: 'All',
+        subtext: 'Calendar scheduled leaves',
+      },
+      {
+        label: 'Upcoming Holidays',
+        value: upcoming,
+        icon: CheckCircle2,
+        color: 'emerald',
+        filterValue: 'Upcoming',
+        subtext: 'Approaching non-working dates',
+      },
+      {
+        label: 'Past Holidays',
+        value: past,
+        icon: Clock,
+        color: 'blue',
+        filterValue: 'Past',
+        subtext: 'Completed holiday events',
+      },
+    ];
   }, [items, totalCount]);
 
   // Client-side period filtering if desired
@@ -284,116 +306,69 @@ export default function HolidayPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header title="Holiday Schedule" />
 
-        <main className="flex-1 p-5 md:p-7 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-5 md:p-6 max-w-7xl w-full">
           
-          {/* Top Banner */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Header Bar */}
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FAF8F5] border border-[#E8E3DA] text-[#9E7432] shadow-2xs">
-                  <CalendarDays className="h-4 w-4" />
-                </span>
-                <h2 className="font-serif text-2xl font-bold text-[#1A1817] tracking-tight">
-                  Official Holidays & Leaves
-                </h2>
-              </div>
-              <p className="text-xs text-[#7A7369] mt-1">
-                Configure calendar holidays, non-working days, and delivery blackout dates.
+              <h1 className="text-sm md:text-base font-semibold text-[#1A1817] tracking-tight">
+                Official Holidays & Leaves
+              </h1>
+              <p className="text-xs text-[#78716C] mt-0.5">
+                Configure calendar holidays, non-working days, and delivery blackout dates
               </p>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => fetchHolidayList(currentPage, searchQuery)}
-                title="Refresh holiday list"
-                className="p-2.5 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#E2DDD5] bg-white hover:bg-[#F7F4EE] text-[11px] font-medium text-[#4A443D] shadow-2xs transition-all cursor-pointer"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#9E7432]' : ''}`} />
+                <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
               </button>
 
               <button
                 onClick={handleOpenCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
-                <Plus className="h-4 w-4 text-[#C99C4B]" />
+                <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
                 <span>Add Holiday</span>
               </button>
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Total Holidays</p>
-                <h3 className="text-xl font-bold text-[#1A1817] mt-0.5">{stats.total}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center">
-                <CalendarDays className="h-4 w-4" />
-              </div>
-            </div>
+          {/* Unique Stats Summary Cards */}
+          <StatsSummaryBar
+            stats={holidayStats}
+            activeFilter={filterPeriod}
+            onSelectFilter={(filter) => {
+              setFilterPeriod(filter);
+              setCurrentPage(1);
+            }}
+          />
 
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">This Month</p>
-                <h3 className="text-xl font-bold text-[#9E7432] mt-0.5">{stats.currentMonth}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#FAF8F5] text-[#9E7432] border border-[#E8E3DA] flex items-center justify-center">
-                <Sparkles className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Upcoming</p>
-                <h3 className="text-xl font-bold text-[#1E7E34] mt-0.5">{stats.upcoming}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB] flex items-center justify-center">
-                <Clock className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Past Holidays</p>
-                <h3 className="text-xl font-bold text-[#78716C] mt-0.5">{stats.past}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#F5EFE3] text-[#78716C] border border-[#E8E3DA] flex items-center justify-center">
-                <CheckCircle2 className="h-4 w-4" />
-              </div>
-            </div>
-          </div>
-
-          {/* Search & Period Filter Toolbar */}
-          <div className="bg-white p-3.5 rounded-xl border border-[#E8E3DA] shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Search & Filter Toolbar */}
+          <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
-            <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9C9488]" />
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full sm:w-72">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9C9488] pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search holiday date or reason..."
-                className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs"
+                className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
 
-            <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5 self-start sm:self-auto">
-              {['All', 'Upcoming', 'Past'].map((period) => (
-                <button
-                  key={period}
-                  type="button"
-                  onClick={() => setFilterPeriod(period)}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
-                    filterPeriod === period
-                      ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
-                      : 'text-[#5C554B] hover:text-[#1A1817]'
-                  }`}
-                >
-                  {period}
-                </button>
-              ))}
-            </div>
+            <StatusFilterToggle
+              label="Period:"
+              options={['All', 'Upcoming', 'Past']}
+              value={filterPeriod}
+              onChange={(period) => setFilterPeriod(period)}
+            />
 
           </div>
 

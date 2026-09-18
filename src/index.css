@@ -2,13 +2,13 @@
 
 @layer base {
   :root {
-    --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
-    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-heading: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+    --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
 
 :root {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #1A1817;
   background-color: #FAF8F5;
   line-height: 1.5;
@@ -25,19 +25,24 @@ body,
   min-height: 100%;
   min-width: 100%;
   background-color: #FAF8F5;
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 body {
   margin: 0;
   background-color: #FAF8F5;
+  color: #1A1817;
 }
 
 .font-display,
-.font-heading,
+.font-heading {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+  letter-spacing: -0.015em;
+}
+
 .font-sans,
 .font-body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
 }
 
 button,
@@ -51,10 +56,10 @@ textarea {
   box-sizing: border-box;
 }
 
-/* Custom scrollbars */
+/* ── Custom Sleek Scrollbars ── */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -64,26 +69,172 @@ textarea {
 ::-webkit-scrollbar-thumb {
   background: #D8D2C5;
   border-radius: 9999px;
+  transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #B8B0A0;
 }
 
-/* Input placeholder styling */
+/* ── Input Placeholder Styling ── */
 input::placeholder,
 textarea::placeholder,
 select::placeholder {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   color: #9C9488 !important;
 }
 
-/* CKEditor 5 Custom Theme & Layout */
+/* ── Micro-Animations & Keyframes ── */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modalPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes subtleShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-pop {
+  animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Global CRM Utility Classes ── */
+.crm-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E8E3DA;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px rgba(26, 24, 23, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.crm-card-hover {
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.crm-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px -4px rgba(26, 24, 23, 0.08), 0 2px 6px -2px rgba(26, 24, 23, 0.04);
+  border-color: #DDD7CD;
+}
+
+.crm-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #1A1817;
+  color: #FAF8F5;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.55rem 1rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+.crm-btn-primary:hover {
+  background-color: #2E2A27;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px -2px rgba(26, 24, 23, 0.12);
+}
+.crm-btn-primary:active {
+  transform: scale(0.97);
+}
+
+.crm-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #FFFFFF;
+  color: #4A443D;
+  border: 1px solid #E2DDD5;
+  font-weight: 600;
+  font-size: 0.75rem;
+  padding: 0.55rem 0.95rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+.crm-btn-secondary:hover {
+  background-color: #FAF8F5;
+  color: #1A1817;
+  border-color: #D8D2C5;
+}
+.crm-btn-secondary:active {
+  transform: scale(0.97);
+}
+
+.crm-input-focus {
+  transition: all 0.18s ease;
+}
+.crm-input-focus:focus {
+  outline: none;
+  border-color: #C99C4B;
+  box-shadow: 0 0 0 3px rgba(201, 156, 75, 0.15);
+  background-color: #FFFFFF;
+}
+
+/* ── CKEditor 5 Custom Theme & Layout ── */
 .ck-editor__editable_inline {
   min-height: 220px !important;
   max-height: 400px !important;
   overflow-y: auto !important;
-  font-family: 'Inter', system-ui, sans-serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif !important;
   font-size: 13px !important;
   color: #1A1817 !important;
   background-color: #FFFFFF !important;
@@ -96,7 +247,7 @@ select::placeholder {
 
 .ck.ck-editor__main > .ck-editor__editable.ck-focused {
   border-color: #C99C4B !important;
-  box-shadow: 0 0 0 1px #C99C4B !important;
+  box-shadow: 0 0 0 2px rgba(201, 156, 75, 0.2) !important;
 }
 
 .ck.ck-toolbar {
@@ -110,4 +261,3 @@ select::placeholder {
   border-bottom-left-radius: 0.75rem !important;
   border-bottom-right-radius: 0.75rem !important;
 }
-

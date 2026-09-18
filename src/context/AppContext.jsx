@@ -10,6 +10,17 @@ export function AppProvider({ children }) {
   const [appVersion, setAppVersion] = useState(null);
   const [imageUrlConfig, setImageUrlConfig] = useState([]);
   const [dotenvConfig, setDotenvConfig] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('emwa_sidebar_collapsed') === 'true';
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('emwa_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     (async () => {
@@ -53,6 +64,7 @@ export function AppProvider({ children }) {
     () => ({
       appStatus,
       companyInfo,
+      setCompanyInfo,
       companyDetails: companyInfo,
       appVersion,
       version: { version_panel: appVersion },
@@ -61,6 +73,9 @@ export function AppProvider({ children }) {
       noImageUrl,
       dotenvConfig,
       setDotenv: setDotenvConfig,
+      isSidebarCollapsed,
+      setIsSidebarCollapsed,
+      toggleSidebar,
       crypto: {
         encryptId,
         decryptId,
@@ -69,7 +84,7 @@ export function AppProvider({ children }) {
         secureStorage,
       },
     }),
-    [appStatus, companyInfo, appVersion, imageUrlConfig, companyLogoUrl, noImageUrl, dotenvConfig],
+    [appStatus, companyInfo, appVersion, imageUrlConfig, companyLogoUrl, noImageUrl, dotenvConfig, isSidebarCollapsed],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

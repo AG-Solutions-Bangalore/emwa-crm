@@ -4,6 +4,9 @@ import Header from '../components/layout/Header';
 import ClientModal from '../components/client/ClientModal';
 import ClientViewModal from '../components/client/ClientViewModal';
 import Pagination from '../components/common/Pagination';
+import StatusFilterToggle from '../components/common/StatusFilterToggle';
+import StatsSummaryBar from '../components/common/StatsSummaryBar';
+import useDebounce from '../hooks/useDebounce';
 import { useAppContext } from '../context/AppContext';
 import {
   getClients,
@@ -24,6 +27,7 @@ import {
   LayoutGrid,
   List,
   Layers,
+  Image,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -63,6 +67,8 @@ export default function ClientPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+
+  const debouncedSearch = useDebounce(searchQuery, 350);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -105,13 +111,13 @@ export default function ClientPage() {
   };
 
   /* ── 1. GET /client with pagination ── */
-  const fetchClientList = async (page = currentPage, query = searchQuery, status = statusFilter) => {
+  const fetchClientList = async (page = currentPage, query = debouncedSearch, status = statusFilter) => {
     setLoading(true);
     try {
       const params = {
         page,
         ...(query.trim() ? { search: query.trim(), q: query.trim() } : {}),
-        ...(status !== 'All' ? { status } : {}),
+        ...(status !== 'All' ? { status, clients_status: status } : {}),
       };
 
       const res = await getClients(params);
@@ -140,8 +146,8 @@ export default function ClientPage() {
   };
 
   useEffect(() => {
-    fetchClientList(currentPage, searchQuery, statusFilter);
-  }, [currentPage, statusFilter]);
+    fetchClientList(currentPage, debouncedSearch, statusFilter);
+  }, [currentPage, debouncedSearch, statusFilter]);
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
@@ -152,7 +158,7 @@ export default function ClientPage() {
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
       setCurrentPage(newPage);
-      fetchClientList(newPage, searchQuery, statusFilter);
+      fetchClientList(newPage, debouncedSearch, statusFilter);
     }
   };
 
@@ -265,11 +271,36 @@ export default function ClientPage() {
   }, [items, statusFilter]);
 
   // Metrics
-  const stats = useMemo(() => {
+  const clientStats = useMemo(() => {
     const total = totalCount || items.length;
-    const active = items.filter((it) => (it.clients_status || it.status || 'Active') === 'Active').length;
-    const inactive = items.filter((it) => (it.clients_status || it.status) === 'Inactive').length;
-    return { total, active, inactive };
+    const active = items.filter((it) => (it.clients_status || it.status || 'Active').toLowerCase() === 'active' || (it.clients_status || it.status) === '1').length;
+    const inactive = items.filter((it) => (it.clients_status || it.status || '').toLowerCase() === 'inactive' || (it.clients_status || it.status) === '0').length;
+    return [
+      {
+        label: 'Total Client Logos',
+        value: total,
+        icon: Building2,
+        color: 'emerald',
+        filterValue: 'All',
+        subtext: 'Partner brand portfolio',
+      },
+      {
+        label: 'Active Logos',
+        value: active,
+        icon: CheckCircle2,
+        color: 'amber',
+        filterValue: 'Active',
+        subtext: 'Visible in brand showcase',
+      },
+      {
+        label: 'Inactive Logos',
+        value: inactive,
+        icon: XCircle,
+        color: 'rose',
+        filterValue: 'Inactive',
+        subtext: 'Hidden from public view',
+      },
+    ];
   }, [items, totalCount]);
 
   return (
@@ -279,120 +310,80 @@ export default function ClientPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header title="Clients & Partners" />
 
-        <main className="flex-1 p-5 md:p-7 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-5 md:p-6 max-w-7xl w-full">
           
-          {/* Top Banner */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Header Bar */}
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FAF8F5] border border-[#E8E3DA] text-[#9E7432] shadow-2xs">
-                  <Building2 className="h-4 w-4" />
-                </span>
-                <h2 className="font-serif text-2xl font-bold text-[#1A1817] tracking-tight">
-                  Clients & Partner Logos
-                </h2>
-              </div>
-              <p className="text-xs text-[#7A7369] mt-1">
-                Manage client partner brand logos showcased on the website.
+              <h1 className="text-sm md:text-base font-semibold text-[#1A1817] tracking-tight">
+                Clients & Partner Logos
+              </h1>
+              <p className="text-xs text-[#78716C] mt-0.5">
+                Manage client partner brand logos showcased on the website
               </p>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => fetchClientList(currentPage, searchQuery, statusFilter)}
-                title="Refresh clients list"
-                className="p-2.5 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#E2DDD5] bg-white hover:bg-[#F7F4EE] text-[11px] font-medium text-[#4A443D] shadow-2xs transition-all cursor-pointer"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#9E7432]' : ''}`} />
+                <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
               </button>
 
               <button
                 onClick={handleOpenCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
-                <Plus className="h-4 w-4 text-[#C99C4B]" />
+                <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
                 <span>Add Client Logo</span>
               </button>
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Total Clients</p>
-                <h3 className="text-xl font-bold text-[#1A1817] mt-0.5">{stats.total}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center">
-                <Layers className="h-4 w-4" />
-              </div>
-            </div>
+          {/* Unique Stats Summary Cards */}
+          <StatsSummaryBar
+            stats={clientStats}
+            activeFilter={statusFilter}
+            onSelectFilter={(filter) => {
+              setStatusFilter(filter);
+              setCurrentPage(1);
+            }}
+          />
 
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Active (Live)</p>
-                <h3 className="text-xl font-bold text-[#1E7E34] mt-0.5">{stats.active}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB] flex items-center justify-center">
-                <CheckCircle2 className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Inactive (Hidden)</p>
-                <h3 className="text-xl font-bold text-[#9A2D2D] mt-0.5">{stats.inactive}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#FBEAEA] text-[#9A2D2D] border border-[#F5C6CB] flex items-center justify-center">
-                <XCircle className="h-4 w-4" />
-              </div>
-            </div>
-          </div>
-
-          {/* Search, Filter Tabs & View Switcher */}
-          <div className="bg-white p-3.5 rounded-xl border border-[#E8E3DA] shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search & Filter Toolbar */}
+          <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
-            <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9C9488]" />
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full sm:w-72">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9C9488] pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by client or company name..."
-                className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs"
+                className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
 
-            <div className="flex items-center justify-between sm:justify-end gap-2.5">
-              
-              {/* Status Filter */}
-              <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5">
-                {['All', 'Active', 'Inactive'].map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => {
-                      setStatusFilter(status);
-                      setCurrentPage(1);
-                    }}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
-                      statusFilter === status
-                        ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
-                        : 'text-[#5C554B] hover:text-[#1A1817]'
-                    }`}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center gap-2.5 self-end sm:self-auto">
+              <StatusFilterToggle
+                options={['All', 'Active', 'Inactive']}
+                value={statusFilter}
+                onChange={(val) => {
+                  setStatusFilter(val);
+                  setCurrentPage(1);
+                }}
+              />
 
               {/* View Mode Toggle */}
-              <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5">
+              <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setViewMode('grid')}
                   title="Grid View"
-                  className={`p-1.5 rounded-md transition cursor-pointer ${
+                  className={`p-1 rounded-md transition cursor-pointer ${
                     viewMode === 'grid'
                       ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
                       : 'text-[#5C554B] hover:text-[#1A1817]'
@@ -404,7 +395,7 @@ export default function ClientPage() {
                   type="button"
                   onClick={() => setViewMode('table')}
                   title="Table View"
-                  className={`p-1.5 rounded-md transition cursor-pointer ${
+                  className={`p-1 rounded-md transition cursor-pointer ${
                     viewMode === 'table'
                       ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
                       : 'text-[#5C554B] hover:text-[#1A1817]'
@@ -413,8 +404,8 @@ export default function ClientPage() {
                   <List className="h-3.5 w-3.5" />
                 </button>
               </div>
-
             </div>
+
           </div>
 
           {/* Main Content Area */}
@@ -458,7 +449,7 @@ export default function ClientPage() {
                   return (
                     <div
                       key={id || index}
-                      className="group bg-white rounded-2xl border border-[#E8E3DA] overflow-hidden shadow-2xs hover:shadow-md hover:border-[#C99C4B]/50 transition-all duration-200 flex flex-col justify-between"
+                      className="group bg-white rounded-2xl border border-[#E8E3DA] overflow-hidden shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between"
                     >
                       {/* Logo Display Box */}
                       <div className="relative aspect-4/3 bg-[#FAF8F5] flex items-center justify-center p-4 border-b border-[#F0ECE3] overflow-hidden">

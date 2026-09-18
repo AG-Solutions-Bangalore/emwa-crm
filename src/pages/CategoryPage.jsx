@@ -3,6 +3,9 @@ import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import CategoryModal from '../components/category/CategoryModal';
 import Pagination from '../components/common/Pagination';
+import StatusFilterToggle from '../components/common/StatusFilterToggle';
+import StatsSummaryBar from '../components/common/StatsSummaryBar';
+import useDebounce from '../hooks/useDebounce';
 import { 
   getCategories, 
   getCategoryById, 
@@ -15,7 +18,10 @@ import {
   Search, 
   Edit2, 
   RefreshCw, 
-  Layers
+  Layers,
+  FolderTree,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -35,6 +41,8 @@ export default function CategoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
 
+  const debouncedSearch = useDebounce(searchQuery, 350);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -49,14 +57,56 @@ export default function CategoryPage() {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ category_name: '', category_status: 'Active' });
 
+  // Compute Active & Inactive counts
+  const activeCount = useMemo(() => {
+    return items.filter((item) => {
+      const s = String(item.category_status || item.categories_status || item.status || '').toLowerCase();
+      return s === 'active' || s === '1';
+    }).length;
+  }, [items]);
+
+  const inactiveCount = useMemo(() => {
+    return items.filter((item) => {
+      const s = String(item.category_status || item.categories_status || item.status || '').toLowerCase();
+      return s === 'inactive' || s === '0';
+    }).length;
+  }, [items]);
+
+  const categoryStats = useMemo(() => [
+    {
+      label: 'Total Categories',
+      value: totalCount,
+      icon: Layers,
+      color: 'emerald',
+      filterValue: 'All',
+      subtext: 'Catalog taxonomy items'
+    },
+    {
+      label: 'Active Categories',
+      value: activeCount,
+      icon: CheckCircle2,
+      color: 'amber',
+      filterValue: 'Active',
+      subtext: 'Live & visible in catalog'
+    },
+    {
+      label: 'Inactive Categories',
+      value: inactiveCount,
+      icon: XCircle,
+      color: 'rose',
+      filterValue: 'Inactive',
+      subtext: 'Archived / hidden'
+    }
+  ], [totalCount, activeCount, inactiveCount]);
+
   /* ── 1. GET /category with pagination ── */
-  const fetchCategories = async (page = currentPage, query = searchQuery, status = statusFilter) => {
+  const fetchCategories = async (page = currentPage, query = debouncedSearch, status = statusFilter) => {
     setLoading(true);
     try {
       const params = {
         page,
         ...(query.trim() ? { search: query.trim(), q: query.trim() } : {}),
-        ...(status !== 'All' ? { status } : {}),
+        ...(status !== 'All' ? { status, category_status: status } : {}),
       };
 
       const res = await getCategories(params);
@@ -85,8 +135,8 @@ export default function CategoryPage() {
   };
 
   useEffect(() => {
-    fetchCategories(currentPage, searchQuery, statusFilter);
-  }, [currentPage, statusFilter]);
+    fetchCategories(currentPage, debouncedSearch, statusFilter);
+  }, [currentPage, debouncedSearch, statusFilter]);
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
@@ -97,7 +147,7 @@ export default function CategoryPage() {
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
       setCurrentPage(newPage);
-      fetchCategories(newPage, searchQuery, statusFilter);
+      fetchCategories(newPage, debouncedSearch, statusFilter);
     }
   };
 
@@ -197,16 +247,6 @@ export default function CategoryPage() {
     }
   };
 
-  // Filter categories by status
-  const displayedItems = useMemo(() => {
-    return items.filter((item) => {
-      const status = item.category_status || item.categories_status || item.status || 'Active';
-      if (statusFilter !== 'All' && status.toLowerCase() !== statusFilter.toLowerCase()) {
-        return false;
-      }
-      return true;
-    });
-  }, [items, statusFilter]);
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F0] text-[#1A1817]">
@@ -232,27 +272,37 @@ export default function CategoryPage() {
               <button
                 onClick={() => fetchCategories(currentPage, searchQuery, statusFilter)}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2DDD5] bg-white hover:bg-[#F7F4EE] text-xs font-medium text-[#4A443D] shadow-2xs transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#E2DDD5] bg-white hover:bg-[#F7F4EE] text-[11px] font-medium text-[#4A443D] shadow-2xs transition-all cursor-pointer"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
                 <span>Refresh</span>
               </button>
 
               <button
                 onClick={handleOpenCreate}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-xs font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
-                <Plus className="h-4 w-4 text-[#C99C4B]" />
+                <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
                 <span>Add Category</span>
               </button>
             </div>
           </div>
 
+          {/* Unique Stats Summary Cards */}
+          <StatsSummaryBar
+            stats={categoryStats}
+            activeFilter={statusFilter}
+            onSelectFilter={(filter) => {
+              setStatusFilter(filter);
+              setCurrentPage(1);
+            }}
+          />
+
           {/* Search & Filter Toolbar */}
-          <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
             {/* Search Form */}
-            <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full md:w-64">
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full sm:w-72">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9C9488] pointer-events-none" />
               <input
                 type="text"
@@ -263,22 +313,15 @@ export default function CategoryPage() {
               />
             </form>
 
-            {/* Status Filter Dropdown */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium text-[#78716C]">Status:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white shadow-2xs transition cursor-pointer"
-              >
-                <option value="All">All Status</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
+            {/* Common Status Toggle Button */}
+            <StatusFilterToggle
+              options={['All', 'Active', 'Inactive']}
+              value={statusFilter}
+              onChange={(val) => {
+                setStatusFilter(val);
+                setCurrentPage(1);
+              }}
+            />
 
           </div>
 
@@ -289,7 +332,7 @@ export default function CategoryPage() {
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#1A1817] border-t-transparent mx-auto mb-2" />
                 <p className="text-xs font-medium">Loading categories...</p>
               </div>
-            ) : displayedItems.length === 0 ? (
+            ) : items.length === 0 ? (
               <div className="py-14 text-center text-[#78716C]">
                 <div className="h-10 w-10 rounded-xl bg-[#F7F4EE] flex items-center justify-center mx-auto mb-2.5 text-[#9C9488]">
                   <Layers className="h-5 w-5" />
@@ -312,7 +355,7 @@ export default function CategoryPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F0ECE3]">
-                      {displayedItems.map((item, index) => {
+                      {items.map((item, index) => {
                         const id = item.id;
                         const name = item.category_name || item.categories || item.name || 'Unnamed Category';
                         const status = item.category_status || item.categories_status || item.status || 'Active';

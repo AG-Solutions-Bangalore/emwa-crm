@@ -2,23 +2,30 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import GroupModal from '../components/group/GroupModal';
+import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import Pagination from '../components/common/Pagination';
+import StatusFilterToggle from '../components/common/StatusFilterToggle';
+import StatsSummaryBar from '../components/common/StatsSummaryBar';
+import useDebounce from '../hooks/useDebounce';
 import {
   getGroups,
   getGroupById,
   createGroup,
   updateGroup,
   updateGroupStatus,
+  deleteGroup,
 } from '../services/groupApi';
 import {
   Plus,
   Search,
   Edit2,
+  Trash2,
   RefreshCw,
   Boxes,
+  Layers,
+  FolderTree,
   CheckCircle2,
   XCircle,
-  Layers,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -43,6 +50,8 @@ export default function GroupPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
 
+  const debouncedSearch = useDebounce(searchQuery, 350);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -58,13 +67,13 @@ export default function GroupPage() {
   const [form, setForm] = useState(initialForm);
 
   /* ── 1. GET /group with pagination ── */
-  const fetchGroupList = async (page = currentPage, query = searchQuery, status = statusFilter) => {
+  const fetchGroupList = async (page = currentPage, query = debouncedSearch, status = statusFilter) => {
     setLoading(true);
     try {
       const params = {
         page,
         ...(query.trim() ? { search: query.trim(), q: query.trim() } : {}),
-        ...(status !== 'All' ? { status } : {}),
+        ...(status !== 'All' ? { status, group_status: status } : {}),
       };
 
       const res = await getGroups(params);
@@ -93,8 +102,8 @@ export default function GroupPage() {
   };
 
   useEffect(() => {
-    fetchGroupList(currentPage, searchQuery, statusFilter);
-  }, [currentPage, statusFilter]);
+    fetchGroupList(currentPage, debouncedSearch, statusFilter);
+  }, [currentPage, debouncedSearch, statusFilter]);
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
@@ -105,7 +114,7 @@ export default function GroupPage() {
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
       setCurrentPage(newPage);
-      fetchGroupList(newPage, searchQuery, statusFilter);
+      fetchGroupList(newPage, debouncedSearch, statusFilter);
     }
   };
 
@@ -213,11 +222,36 @@ export default function GroupPage() {
   }, [items, statusFilter]);
 
   // Metrics
-  const stats = useMemo(() => {
+  const groupStats = useMemo(() => {
     const total = totalCount || items.length;
-    const active = items.filter((it) => (it.group_status || it.status || 'Active') === 'Active').length;
-    const inactive = items.filter((it) => (it.group_status || it.status) === 'Inactive').length;
-    return { total, active, inactive };
+    const active = items.filter((it) => (it.group_status || it.status || 'Active').toLowerCase() === 'active' || (it.group_status || it.status) === '1').length;
+    const inactive = items.filter((it) => (it.group_status || it.status || '').toLowerCase() === 'inactive' || (it.group_status || it.status) === '0').length;
+    return [
+      {
+        label: 'Total Groups',
+        value: total,
+        icon: Layers,
+        color: 'emerald',
+        filterValue: 'All',
+        subtext: 'Configured catalog groups',
+      },
+      {
+        label: 'Active Groups',
+        value: active,
+        icon: CheckCircle2,
+        color: 'amber',
+        filterValue: 'Active',
+        subtext: 'Active in catalog',
+      },
+      {
+        label: 'Inactive Groups',
+        value: inactive,
+        icon: XCircle,
+        color: 'rose',
+        filterValue: 'Inactive',
+        subtext: 'Disabled or archived',
+      },
+    ];
   }, [items, totalCount]);
 
   return (
@@ -227,109 +261,71 @@ export default function GroupPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header title="Group Management" />
 
-        <main className="flex-1 p-5 md:p-7 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-5 md:p-6 max-w-7xl w-full">
           
-          {/* Top Banner */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Header Bar */}
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FAF8F5] border border-[#E8E3DA] text-[#9E7432] shadow-2xs">
-                  <Boxes className="h-4 w-4" />
-                </span>
-                <h2 className="font-serif text-2xl font-bold text-[#1A1817] tracking-tight">
-                  Product Groups
-                </h2>
-              </div>
-              <p className="text-xs text-[#7A7369] mt-1">
-                Organize products into hierarchical groupings and collections.
+              <h1 className="text-sm md:text-base font-semibold text-[#1A1817] tracking-tight">
+                Product Groups
+              </h1>
+              <p className="text-xs text-[#78716C] mt-0.5">
+                Organize products into hierarchical groupings and collections
               </p>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => fetchGroupList(currentPage, searchQuery, statusFilter)}
-                title="Refresh groups list"
-                className="p-2.5 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#E2DDD5] bg-white hover:bg-[#F7F4EE] text-[11px] font-medium text-[#4A443D] shadow-2xs transition-all cursor-pointer"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#9E7432]' : ''}`} />
+                <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
               </button>
 
               <button
                 onClick={handleOpenCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
-                <Plus className="h-4 w-4 text-[#C99C4B]" />
-                <span>Create Group</span>
+                <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
+                <span>Add Group</span>
               </button>
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Total Groups</p>
-                <h3 className="text-xl font-bold text-[#1A1817] mt-0.5">{stats.total}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center">
-                <Boxes className="h-4 w-4" />
-              </div>
-            </div>
+          {/* Unique Stats Summary Cards */}
+          <StatsSummaryBar
+            stats={groupStats}
+            activeFilter={statusFilter}
+            onSelectFilter={(filter) => {
+              setStatusFilter(filter);
+              setCurrentPage(1);
+            }}
+          />
 
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Active Groups</p>
-                <h3 className="text-xl font-bold text-[#1E7E34] mt-0.5">{stats.active}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB] flex items-center justify-center">
-                <CheckCircle2 className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Inactive Groups</p>
-                <h3 className="text-xl font-bold text-[#9A2D2D] mt-0.5">{stats.inactive}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#FBEAEA] text-[#9A2D2D] border border-[#F5C6CB] flex items-center justify-center">
-                <XCircle className="h-4 w-4" />
-              </div>
-            </div>
-          </div>
-
-          {/* Search & Filter Controls */}
-          <div className="bg-white p-3.5 rounded-xl border border-[#E8E3DA] shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Search & Filter Toolbar */}
+          <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
-            <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9C9488]" />
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full sm:w-72">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9C9488] pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search groups by name or ID..."
-                className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs"
+                className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
 
-            <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5 self-start sm:self-auto">
-              {['All', 'Active', 'Inactive'].map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => {
-                    setStatusFilter(status);
-                    setCurrentPage(1);
-                  }}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
-                    statusFilter === status
-                      ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
-                      : 'text-[#5C554B] hover:text-[#1A1817]'
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
+            <StatusFilterToggle
+              options={['All', 'Active', 'Inactive']}
+              value={statusFilter}
+              onChange={(val) => {
+                setStatusFilter(val);
+                setCurrentPage(1);
+              }}
+            />
 
           </div>
 
@@ -339,7 +335,7 @@ export default function GroupPage() {
               <RefreshCw className="h-7 w-7 animate-spin text-[#9E7432] mx-auto mb-3" />
               <p className="text-xs font-medium text-[#78716C]">Loading product groups...</p>
             </div>
-          ) : displayedItems.length === 0 ? (
+          ) : items.length === 0 ? (
             <div className="bg-white rounded-2xl border border-[#E8E3DA] p-14 text-center shadow-2xs">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] mb-4">
                 <Boxes className="h-7 w-7" />
@@ -372,7 +368,7 @@ export default function GroupPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F0ECE3]">
-                    {displayedItems.map((item, index) => {
+                    {items.map((item, index) => {
                       const id = item.id;
                       const name = item.group_name || item.name || 'Untitled Group';
                       const status = item.group_status || item.status || 'Active';

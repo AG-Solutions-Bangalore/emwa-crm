@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import EnquiryDetailsModal from '../components/enquiry/EnquiryDetailsModal';
 import Pagination from '../components/common/Pagination';
+import StatusFilterToggle from '../components/common/StatusFilterToggle';
+import StatsSummaryBar from '../components/common/StatsSummaryBar';
+import useDebounce from '../hooks/useDebounce';
 import { 
   getEnquiries, 
   getEnquiryById, 
@@ -15,7 +18,10 @@ import {
   Trash2, 
   Eye, 
   RefreshCw, 
-  MessageSquare
+  MessageSquare,
+  CheckCircle2,
+  Clock,
+  XCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -46,6 +52,7 @@ export default function EnquiryPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearch = useDebounce(searchQuery, 350);
   const [statusFilter, setStatusFilter] = useState('All');
 
   // Pagination state
@@ -67,7 +74,7 @@ export default function EnquiryPage() {
   const [deleting, setDeleting] = useState(false);
 
   /* ── 1. GET /enquiry with pagination ── */
-  const fetchEnquiries = async (page = currentPage, query = searchQuery, status = statusFilter) => {
+  const fetchEnquiries = async (page = currentPage, query = debouncedSearch, status = statusFilter) => {
     setLoading(true);
     try {
       const params = {
@@ -102,8 +109,8 @@ export default function EnquiryPage() {
   };
 
   useEffect(() => {
-    fetchEnquiries(currentPage, searchQuery, statusFilter);
-  }, [currentPage, statusFilter]);
+    fetchEnquiries(currentPage, debouncedSearch, statusFilter);
+  }, [currentPage, debouncedSearch, statusFilter]);
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
@@ -114,7 +121,7 @@ export default function EnquiryPage() {
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
       setCurrentPage(newPage);
-      fetchEnquiries(newPage, searchQuery, statusFilter);
+      fetchEnquiries(newPage, debouncedSearch, statusFilter);
     }
   };
 
@@ -189,6 +196,48 @@ export default function EnquiryPage() {
     return 'bg-[#FEF6E9] text-[#9A6218] border-[#FAD8A5]';
   };
 
+  // Metrics
+  const enquiryStats = React.useMemo(() => {
+    const total = totalCount || items.length;
+    let pending = 0;
+    let completed = 0;
+    let cancelled = 0;
+
+    items.forEach((it) => {
+      const s = String(it.enquiryStatus || it.enquiry_status || it.status || 'Pending').toLowerCase();
+      if (s === 'completed') completed++;
+      else if (s === 'cancel' || s === 'cancelled') cancelled++;
+      else pending++;
+    });
+
+    return [
+      {
+        label: 'Total Enquiries',
+        value: total,
+        icon: MessageSquare,
+        color: 'emerald',
+        filterValue: 'All',
+        subtext: 'Customer tickets & requests',
+      },
+      {
+        label: 'Open / Pending',
+        value: pending,
+        icon: Clock,
+        color: 'amber',
+        filterValue: 'Pending',
+        subtext: 'Awaiting resolution',
+      },
+      {
+        label: 'Completed Enquiries',
+        value: completed,
+        icon: CheckCircle2,
+        color: 'blue',
+        filterValue: 'Completed',
+        subtext: 'Resolved customer requests',
+      },
+    ];
+  }, [items, totalCount]);
+
   return (
     <div className="flex min-h-screen bg-[#F8F6F0] text-[#1A1817]">
       <Sidebar />
@@ -210,19 +259,26 @@ export default function EnquiryPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white text-[#3D372E] border border-[#E2DDD5] shadow-2xs">
-                {totalCount} Total
-              </span>
               <button
                 onClick={() => fetchEnquiries(currentPage, searchQuery, statusFilter)}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2DDD5] bg-white hover:bg-[#F7F4EE] text-xs font-medium text-[#4A443D] shadow-2xs transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#E2DDD5] bg-white hover:bg-[#F7F4EE] text-[11px] font-medium text-[#4A443D] shadow-2xs transition-all cursor-pointer"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
                 <span>Refresh</span>
               </button>
             </div>
           </div>
+
+          {/* Unique Stats Summary Cards */}
+          <StatsSummaryBar
+            stats={enquiryStats}
+            activeFilter={statusFilter}
+            onSelectFilter={(filter) => {
+              setStatusFilter(filter);
+              setCurrentPage(1);
+            }}
+          />
 
           {/* Search and Status Filters Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col md:flex-row items-center justify-between gap-3">
@@ -234,29 +290,20 @@ export default function EnquiryPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search & hit Enter..."
-                className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
+                placeholder="Search enquiry..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
 
-            {/* Status Filter Dropdown */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium text-[#78716C]">Status:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white shadow-2xs transition cursor-pointer"
-              >
-                <option value="All">All Status</option>
-                <option value="Pending">Pending</option>
-                <option value="Processing">Processing</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancel">Cancelled</option>
-              </select>
-            </div>
+            {/* Status Filter Toggle */}
+            <StatusFilterToggle
+              options={['All', 'Pending', 'Processing', 'Completed', 'Cancel']}
+              value={statusFilter}
+              onChange={(newStatus) => {
+                setStatusFilter(newStatus);
+                setCurrentPage(1);
+              }}
+            />
 
           </div>
 

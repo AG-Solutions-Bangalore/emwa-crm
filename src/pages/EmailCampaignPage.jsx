@@ -31,7 +31,22 @@ import {
 } from '../services/emailCampaignApi';
 import EmailCampaignModal from '../components/campaign/EmailCampaignModal';
 import EmailCampaignViewModal from '../components/campaign/EmailCampaignViewModal';
+import Pagination from '../components/common/Pagination';
+import StatusFilterToggle from '../components/common/StatusFilterToggle';
+import StatsSummaryBar from '../components/common/StatsSummaryBar';
+import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
+import useDebounce from '../hooks/useDebounce';
 import toast from 'react-hot-toast';
+
+function extractList(response) {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data?.data)) return response.data.data;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.campaigns?.data)) return response.campaigns.data;
+  if (Array.isArray(response?.campaigns)) return response.campaigns;
+  if (Array.isArray(response?.email_campaign)) return response.email_campaign;
+  return [];
+}
 
 export default function EmailCampaignPage() {
   const [campaigns, setCampaigns] = useState([]);
@@ -42,6 +57,9 @@ export default function EmailCampaignPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
+  // Debounced search query
+  const debouncedSearch = useDebounce(search, 350);
+
   // Modal states
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState(null);
@@ -51,30 +69,25 @@ export default function EmailCampaignPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    fetchCampaigns(currentPage);
-  }, [currentPage]);
-
-  const fetchCampaigns = async (page = 1) => {
+  const fetchCampaigns = async (page = currentPage, query = debouncedSearch, status = statusFilter) => {
     setLoading(true);
     try {
-      const res = await getEmailCampaigns({ page, search: search.trim() });
-      
-      let list = [];
-      if (Array.isArray(res)) {
-        list = res;
-        setTotalPages(1);
-        setTotalCount(res.length);
-      } else if (res?.data && Array.isArray(res.data)) {
-        list = res.data;
-        setTotalPages(res.last_page || res.meta?.last_page || 1);
-        setTotalCount(res.total || res.meta?.total || res.data.length);
-      } else if (res?.campaigns && Array.isArray(res.campaigns)) {
-        list = res.campaigns;
-        setTotalPages(res.last_page || 1);
-        setTotalCount(res.total || res.campaigns.length);
-      }
+      const params = {
+        page,
+        ...(query.trim() ? { search: query.trim(), q: query.trim() } : {}),
+        ...(status !== 'All' ? { status, email_campaign_status: status } : {}),
+      };
+
+      const res = await getEmailCampaigns(params);
+      const list = extractList(res);
       setCampaigns(list);
+
+      const paginationObj = res?.data?.data ? res?.data : (res?.data || res);
+      const total = paginationObj?.total ?? list.length;
+      const lastPage = paginationObj?.last_page ?? Math.max(1, Math.ceil(total / (paginationObj?.per_page || 10)));
+      
+      setTotalPages(lastPage);
+      setTotalCount(total);
     } catch (err) {
       console.error('Failed to load email campaigns:', err);
       toast.error('Failed to load email campaigns.');
@@ -83,10 +96,19 @@ export default function EmailCampaignPage() {
     }
   };
 
+  useEffect(() => {
+    fetchCampaigns(currentPage, debouncedSearch, statusFilter);
+  }, [currentPage, debouncedSearch, statusFilter]);
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     setCurrentPage(1);
-    fetchCampaigns(1);
+    fetchCampaigns(1, search, statusFilter);
+  };
+
+  const handleStatusFilterChange = (newStatus) => {
+    setStatusFilter(newStatus);
+    setCurrentPage(1);
   };
 
   const handleOpenCreate = () => {
@@ -96,7 +118,6 @@ export default function EmailCampaignPage() {
 
   const handleOpenEdit = async (campaign) => {
     try {
-      // If detailed data needed
       const detailed = await getEmailCampaignById(campaign.id);
       setEditingCampaign(detailed?.data || detailed || campaign);
     } catch {
@@ -123,7 +144,7 @@ export default function EmailCampaignPage() {
       await createEmailCampaign(formData);
       toast.success('Email campaign created successfully.');
     }
-    fetchCampaigns(currentPage);
+    fetchCampaigns(currentPage, debouncedSearch, statusFilter);
   };
 
   const handleStatusChange = async (id, newStatus) => {
@@ -151,7 +172,7 @@ export default function EmailCampaignPage() {
       await deleteEmailCampaign(deleteConfirmId);
       toast.success('Campaign deleted successfully.');
       setDeleteConfirmId(null);
-      fetchCampaigns(currentPage);
+      fetchCampaigns(currentPage, debouncedSearch, statusFilter);
     } catch (err) {
       console.error('Delete failed:', err);
       toast.error('Failed to delete campaign.');
@@ -160,29 +181,9 @@ export default function EmailCampaignPage() {
     }
   };
 
-  // Filtered campaigns
-  const filteredCampaigns = useMemo(() => {
-    return campaigns.filter((c) => {
-      const matchesSearch = 
-        !search ||
-        (c.email_campaign_name && c.email_campaign_name.toLowerCase().includes(search.toLowerCase())) ||
-        (c.email_campaign_subject && c.email_campaign_subject.toLowerCase().includes(search.toLowerCase())) ||
-        (c.name && c.name.toLowerCase().includes(search.toLowerCase()));
-
-      const st = String(c.email_campaign_status || c.status || 'Pending').toLowerCase();
-      const matchesStatus = 
-        statusFilter === 'All' || 
-        (statusFilter === 'Pending' && st === 'pending') ||
-        (statusFilter === 'Sent' && st === 'sent') ||
-        (statusFilter === 'Hold' && st === 'hold');
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [campaigns, search, statusFilter]);
-
   // Statistics
-  const stats = useMemo(() => {
-    const total = campaigns.length;
+  const emailStats = useMemo(() => {
+    const total = totalCount || campaigns.length;
     let pending = 0;
     let sent = 0;
     let hold = 0;
@@ -194,8 +195,33 @@ export default function EmailCampaignPage() {
       else pending++;
     });
 
-    return { total, pending, sent, hold };
-  }, [campaigns]);
+    return [
+      {
+        label: 'Total Email Broadcasts',
+        value: total,
+        icon: Mail,
+        color: 'amber',
+        filterValue: 'All',
+        subtext: 'Scheduled & delivered campaigns',
+      },
+      {
+        label: 'Pending Dispatches',
+        value: pending,
+        icon: Clock,
+        color: 'blue',
+        filterValue: 'Pending',
+        subtext: 'Queued for delivery',
+      },
+      {
+        label: 'Delivered Campaigns',
+        value: sent,
+        icon: CheckCircle2,
+        color: 'emerald',
+        filterValue: 'Sent',
+        subtext: 'Successfully transmitted',
+      },
+    ];
+  }, [campaigns, totalCount]);
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F0] text-[#1A1817]">
@@ -203,96 +229,73 @@ export default function EmailCampaignPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header title="Email Campaigns" />
 
-        <main className="flex-1 p-6 md:p-8 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <main className="flex-1 p-5 md:p-6 max-w-7xl w-full">
+          
+          {/* Header Bar */}
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h1 className="text-xl font-bold text-[#1A1817] flex items-center gap-2.5">
-                <Mail className="h-6 w-6 text-[#C99C4B]" />
+              <h1 className="text-sm md:text-base font-semibold text-[#1A1817] tracking-tight">
                 Email Campaigns
               </h1>
-              <p className="text-xs text-[#8C8275] mt-0.5">
+              <p className="text-xs text-[#78716C] mt-0.5">
                 Schedule broadcast marketing emails, track executions, and manage recipient audiences
               </p>
             </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => fetchCampaigns(currentPage)}
-            disabled={loading}
-            className="flex items-center gap-2 rounded-xl border border-[#E8E3DA] bg-white px-3.5 py-2 text-xs font-semibold text-[#5C554B] hover:bg-[#FAF8F5] transition shadow-2xs cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-[#C99C4B]' : ''}`} />
-            <span>Refresh</span>
-          </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => fetchCampaigns(currentPage)}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#E2DDD5] bg-white hover:bg-[#F7F4EE] text-[11px] font-medium text-[#4A443D] shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
 
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-2 rounded-xl bg-[#1A1817] px-4 py-2 text-xs font-semibold text-[#FAF8F5] hover:bg-[#2E2A27] transition shadow-2xs cursor-pointer"
-          >
-            <Plus className="h-4 w-4 text-[#C99C4B]" />
-            <span>New Campaign</span>
-          </button>
-        </div>
-      </div>
+              <button
+                onClick={handleOpenCreate}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
+                <span>Create Email Campaign</span>
+              </button>
+            </div>
+          </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-2xl border border-[#E8E3DA] bg-white p-4 shadow-2xs">
-          <p className="text-[11px] font-semibold text-[#8C8275] uppercase tracking-wider">Total Broadcasts</p>
-          <p className="text-xl font-bold text-[#1A1817] mt-1">{stats.total}</p>
-        </div>
-        <div className="rounded-2xl border border-[#E8E3DA] bg-white p-4 shadow-2xs">
-          <p className="text-[11px] font-semibold text-[#8C8275] uppercase tracking-wider flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5 text-[#C99C4B]" /> Pending
-          </p>
-          <p className="text-xl font-bold text-[#8C6D23] mt-1">{stats.pending}</p>
-        </div>
-        <div className="rounded-2xl border border-[#E8E3DA] bg-white p-4 shadow-2xs">
-          <p className="text-[11px] font-semibold text-[#8C8275] uppercase tracking-wider flex items-center gap-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5 text-[#2D5A34]" /> Sent
-          </p>
-          <p className="text-xl font-bold text-[#2D5A34] mt-1">{stats.sent}</p>
-        </div>
-        <div className="rounded-2xl border border-[#E8E3DA] bg-white p-4 shadow-2xs">
-          <p className="text-[11px] font-semibold text-[#8C8275] uppercase tracking-wider flex items-center gap-1.5">
-            <ShieldAlert className="h-3.5 w-3.5 text-[#8F4E24]" /> On Hold
-          </p>
-          <p className="text-xl font-bold text-[#8F4E24] mt-1">{stats.hold}</p>
-        </div>
-      </div>
-
-      {/* Filters & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-        {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1.5 bg-[#E8E3DA]/50 p-1 rounded-xl w-full sm:w-auto">
-          {['All', 'Pending', 'Sent', 'Hold'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setStatusFilter(tab)}
-              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                statusFilter === tab
-                  ? 'bg-[#1A1817] text-[#FAF8F5] shadow-2xs'
-                  : 'text-[#5C554B] hover:text-[#1A1817]'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {/* Search Bar */}
-        <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-72">
-          <input
-            type="text"
-            placeholder="Search email campaigns..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-[#E8E3DA] bg-white pl-9 pr-3.5 py-2 text-xs text-[#1A1817] placeholder:text-[#8C8275]/60 outline-none transition focus:border-[#C99C4B] focus:ring-2 focus:ring-[#C99C4B]/20"
+          {/* Unique Stats Summary Cards */}
+          <StatsSummaryBar
+            stats={emailStats}
+            activeFilter={statusFilter}
+            onSelectFilter={(filter) => {
+              setStatusFilter(filter);
+              setCurrentPage(1);
+            }}
           />
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#8C8275]" />
-        </form>
-      </div>
+
+          {/* Search & Filter Toolbar */}
+          <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full sm:w-72">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9C9488] pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search email campaigns..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
+              />
+            </form>
+
+            <StatusFilterToggle
+              options={['All', 'Pending', 'Sent', 'Hold']}
+              value={statusFilter}
+              onChange={(tab) => handleStatusFilterChange(tab)}
+            />
+
+          </div>
 
       {/* Table Container */}
       <div className="rounded-2xl border border-[#E8E3DA] bg-white overflow-hidden shadow-2xs">
@@ -302,7 +305,7 @@ export default function EmailCampaignPage() {
             <p className="text-xs font-semibold text-[#1A1817]">Loading email campaigns...</p>
             <p className="text-[11px] text-[#8C8275]">Please wait a moment</p>
           </div>
-        ) : filteredCampaigns.length === 0 ? (
+        ) : campaigns.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FAF8F5] border border-[#E8E3DA] text-[#8C8275] mb-3">
               <Mail className="h-6 w-6" />
@@ -319,7 +322,7 @@ export default function EmailCampaignPage() {
                 className="mt-4 flex items-center gap-2 rounded-xl bg-[#1A1817] px-4 py-2 text-xs font-semibold text-[#FAF8F5] hover:bg-[#2E2A27] transition shadow-2xs cursor-pointer"
               >
                 <Plus className="h-4 w-4 text-[#C99C4B]" />
-                <span>Create Campaign</span>
+                <span>Create Email Campaign</span>
               </button>
             )}
           </div>
@@ -337,7 +340,7 @@ export default function EmailCampaignPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8E3DA] text-xs">
-                {filteredCampaigns.map((camp) => {
+                {campaigns.map((camp) => {
                   const name = camp.email_campaign_name || camp.name || 'Unnamed Campaign';
                   const subject = camp.email_campaign_subject || camp.subject || '—';
                   const date = camp.email_campaign_date || camp.date || '—';
@@ -433,32 +436,17 @@ export default function EmailCampaignPage() {
           </div>
         )}
 
-        {/* Pagination Bar */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-[#E8E3DA] px-4 py-3 bg-[#FAF8F5]/60 text-xs">
-            <span className="text-[#8C8275]">
-              Page <span className="font-semibold text-[#1A1817]">{currentPage}</span> of{' '}
-              <span className="font-semibold text-[#1A1817]">{totalPages}</span> ({totalCount} campaigns)
-            </span>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                disabled={currentPage <= 1 || loading}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="p-1.5 rounded-lg border border-[#E8E3DA] bg-white text-[#5C554B] hover:bg-[#FAF8F5] disabled:opacity-40 transition cursor-pointer"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                disabled={currentPage >= totalPages || loading}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="p-1.5 rounded-lg border border-[#E8E3DA] bg-white text-[#5C554B] hover:bg-[#FAF8F5] disabled:opacity-40 transition cursor-pointer"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Server Pagination */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={totalCount}
+          perPage={10}
+          onPageChange={(newPage) => {
+            setCurrentPage(newPage);
+            fetchCampaigns(newPage);
+          }}
+        />
       </div>
 
       {/* Campaign Create/Edit Modal */}

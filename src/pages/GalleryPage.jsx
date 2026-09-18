@@ -4,6 +4,9 @@ import Header from '../components/layout/Header';
 import GalleryModal from '../components/gallery/GalleryModal';
 import GalleryImageViewModal from '../components/gallery/GalleryImageViewModal';
 import Pagination from '../components/common/Pagination';
+import StatusFilterToggle from '../components/common/StatusFilterToggle';
+import StatsSummaryBar from '../components/common/StatsSummaryBar';
+import useDebounce from '../hooks/useDebounce';
 import { useAppContext } from '../context/AppContext';
 import {
   getGalleries,
@@ -65,6 +68,8 @@ export default function GalleryPage() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
 
+  const debouncedSearch = useDebounce(searchQuery, 350);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -114,7 +119,7 @@ export default function GalleryPage() {
   };
 
   /* ── 1. GET /gallery with pagination ── */
-  const fetchGalleryList = async (page = currentPage, query = searchQuery, status = statusFilter) => {
+  const fetchGalleryList = async (page = currentPage, query = debouncedSearch, status = statusFilter) => {
     setLoading(true);
     try {
       const params = {
@@ -163,8 +168,8 @@ export default function GalleryPage() {
   };
 
   useEffect(() => {
-    fetchGalleryList(currentPage, searchQuery, statusFilter);
-  }, [currentPage]);
+    fetchGalleryList(currentPage, debouncedSearch, statusFilter);
+  }, [currentPage, debouncedSearch, statusFilter]);
 
   const handleSearchSubmit = (e) => {
     e?.preventDefault();
@@ -175,7 +180,7 @@ export default function GalleryPage() {
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
       setCurrentPage(newPage);
-      fetchGalleryList(newPage, searchQuery, statusFilter);
+      fetchGalleryList(newPage, debouncedSearch, statusFilter);
     }
   };
 
@@ -312,23 +317,47 @@ export default function GalleryPage() {
     setPreviewModalOpen(true);
   };
 
-  // Client-side filtering ensures selected status filter is strictly honored
-  const filteredItems = useMemo(() => {
+  // Metrics
+  const activeCount = useMemo(() => {
     return items.filter((item) => {
-      const status = String(item.gallery_status || item.status || 'Active').trim().toLowerCase();
-      if (statusFilter === 'Active') return status === 'active';
-      if (statusFilter === 'Inactive') return status === 'inactive';
-      return true;
-    });
-  }, [items, statusFilter]);
+      const s = String(item.gallery_status || item.status || '').toLowerCase();
+      return s === 'active' || s === '1';
+    }).length;
+  }, [items]);
 
-  // Statistics for header metrics
-  const stats = useMemo(() => {
-    const total = totalCount || items.length;
-    const active = items.filter((it) => String(it.gallery_status || it.status || 'Active').trim().toLowerCase() === 'active').length;
-    const inactive = items.filter((it) => String(it.gallery_status || it.status || '').trim().toLowerCase() === 'inactive').length;
-    return { total, active, inactive };
-  }, [items, totalCount]);
+  const inactiveCount = useMemo(() => {
+    return items.filter((item) => {
+      const s = String(item.gallery_status || item.status || '').toLowerCase();
+      return s === 'inactive' || s === '0';
+    }).length;
+  }, [items]);
+
+  const galleryStats = useMemo(() => [
+    {
+      label: 'Total Gallery Photos',
+      value: totalCount || items.length,
+      icon: ImageIcon,
+      color: 'emerald',
+      filterValue: 'All',
+      subtext: 'Media assets in storage',
+    },
+    {
+      label: 'Active Photos',
+      value: activeCount,
+      icon: CheckCircle2,
+      color: 'amber',
+      filterValue: 'Active',
+      subtext: 'Visible in live showcase',
+    },
+    {
+      label: 'Inactive / Hidden',
+      value: inactiveCount,
+      icon: XCircle,
+      color: 'rose',
+      filterValue: 'Inactive',
+      subtext: 'Archived media',
+    },
+  ], [items, totalCount, activeCount, inactiveCount]);
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F0] text-[#1A1817]">
@@ -337,122 +366,80 @@ export default function GalleryPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header title="Gallery Management" />
 
-        <main className="flex-1 p-5 md:p-7 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-5 md:p-6 max-w-7xl w-full">
           
-          {/* Page Top Banner / Title & Primary Action */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Header Bar */}
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FAF8F5] border border-[#E8E3DA] text-[#9E7432] shadow-2xs">
-                  <ImageIcon className="h-4 w-4" />
-                </span>
-                <h2 className="font-serif text-2xl font-bold text-[#1A1817] tracking-tight">
-                  Media Gallery
-                </h2>
-              </div>
-              <p className="text-xs text-[#7A7369] mt-1">
-                Upload and manage high-resolution portfolio images, banners, and showcase photos.
+              <h1 className="text-sm md:text-base font-semibold text-[#1A1817] tracking-tight">
+                Media Gallery
+              </h1>
+              <p className="text-xs text-[#78716C] mt-0.5">
+                Upload and manage high-resolution portfolio images, banners, and showcase photos
               </p>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => fetchGalleryList(currentPage, searchQuery, statusFilter)}
-                title="Refresh gallery list"
-                className="p-2.5 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#E2DDD5] bg-white hover:bg-[#F7F4EE] text-[11px] font-medium text-[#4A443D] shadow-2xs transition-all cursor-pointer"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-[#9E7432]' : ''}`} />
+                <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
               </button>
 
               <button
                 onClick={handleOpenCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-xs font-semibold shadow-xs transition active:scale-95 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
-                <Plus className="h-4 w-4 text-[#C99C4B]" />
+                <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
                 <span>Upload Photos</span>
               </button>
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Total Photos</p>
-                <h3 className="text-xl font-bold text-[#1A1817] mt-0.5">{stats.total}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center">
-                <Layers className="h-4 w-4" />
-              </div>
-            </div>
+          {/* Unique Stats Summary Cards */}
+          <StatsSummaryBar
+            stats={galleryStats}
+            activeFilter={statusFilter}
+            onSelectFilter={(filter) => {
+              setStatusFilter(filter);
+              setCurrentPage(1);
+            }}
+          />
 
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Active (Live)</p>
-                <h3 className="text-xl font-bold text-[#1E7E34] mt-0.5">{stats.active}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB] flex items-center justify-center">
-                <CheckCircle2 className="h-4 w-4" />
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl border border-[#E8E3DA] shadow-2xs flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-semibold tracking-wider text-[#8C8275] uppercase">Inactive (Hidden)</p>
-                <h3 className="text-xl font-bold text-[#9A2D2D] mt-0.5">{stats.inactive}</h3>
-              </div>
-              <div className="h-9 w-9 rounded-lg bg-[#FBEAEA] text-[#9A2D2D] border border-[#F5C6CB] flex items-center justify-center">
-                <XCircle className="h-4 w-4" />
-              </div>
-            </div>
-          </div>
-
-          {/* Search, Filter Tabs & View Toggle Controls */}
-          <div className="bg-white p-3.5 rounded-xl border border-[#E8E3DA] shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          {/* Search & Filter Toolbar */}
+          <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
-            {/* Search Input */}
-            <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9C9488]" />
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full sm:w-72">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9C9488] pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search gallery by ID or keyword..."
-                className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs"
+                className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
 
-            {/* Filter Tabs & View Switcher */}
-            <div className="flex items-center justify-between sm:justify-end gap-2.5">
-              
-              {/* Status Filter Tabs */}
-              <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5">
-                {['All', 'Active', 'Inactive'].map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => {
-                      setStatusFilter(status);
-                      setCurrentPage(1);
-                    }}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
-                      statusFilter === status
-                        ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
-                        : 'text-[#5C554B] hover:text-[#1A1817]'
-                    }`}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center gap-2.5 self-end sm:self-auto">
+              <StatusFilterToggle
+                options={['All', 'Active', 'Inactive']}
+                value={statusFilter}
+                onChange={(val) => {
+                  setStatusFilter(val);
+                  setCurrentPage(1);
+                }}
+              />
 
               {/* View Mode Toggle (Grid / Table) */}
-              <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5">
+              <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setViewMode('grid')}
                   title="Grid View"
-                  className={`p-1.5 rounded-md transition cursor-pointer ${
+                  className={`p-1 rounded-md transition cursor-pointer ${
                     viewMode === 'grid'
                       ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
                       : 'text-[#5C554B] hover:text-[#1A1817]'
@@ -464,7 +451,7 @@ export default function GalleryPage() {
                   type="button"
                   onClick={() => setViewMode('table')}
                   title="Table View"
-                  className={`p-1.5 rounded-md transition cursor-pointer ${
+                  className={`p-1 rounded-md transition cursor-pointer ${
                     viewMode === 'table'
                       ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
                       : 'text-[#5C554B] hover:text-[#1A1817]'
@@ -473,8 +460,8 @@ export default function GalleryPage() {
                   <List className="h-3.5 w-3.5" />
                 </button>
               </div>
-
             </div>
+
           </div>
 
           {/* Main Content Area */}
@@ -483,7 +470,7 @@ export default function GalleryPage() {
               <RefreshCw className="h-7 w-7 animate-spin text-[#9E7432] mx-auto mb-3" />
               <p className="text-xs font-medium text-[#78716C]">Loading gallery images...</p>
             </div>
-          ) : filteredItems.length === 0 ? (
+          ) : items.length === 0 ? (
             <div className="bg-white rounded-2xl border border-[#E8E3DA] p-14 text-center shadow-2xs">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] mb-4">
                 <ImageIcon className="h-7 w-7" />
@@ -506,17 +493,17 @@ export default function GalleryPage() {
             /* ── GRID VIEW ── */
             <div className="space-y-6">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
-                {filteredItems.map((item, index) => {
+                {items.map((item, index) => {
                   const imageField = item.gallery_image || item.image || item.photo || item.gallery || item.file_name || item.gallery_photo || item.image_name;
                   const imageUrl = resolveImageUrl(imageField, item);
                   const status = item.gallery_status || item.status || 'Active';
                   const isActive = status === 'Active';
-                  const date = item.created_at || item.createdDate || item.date;
+                  const date = item.created_at || item.createdDate || item.created_date || item.date || item.gallery_date || item.createdAt || item.updated_at || item.updatedAt || item.gallery_created_at || item.timestamp;
 
                   return (
                     <div
                       key={item.id || index}
-                      className="group bg-white rounded-xl border border-[#E8E3DA] overflow-hidden shadow-2xs hover:shadow-md hover:border-[#C99C4B]/50 transition-all duration-200 flex flex-col"
+                      className="group bg-white rounded-xl border border-[#E8E3DA] overflow-hidden shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col"
                     >
                       {/* Image Thumbnail with Overlay Hover Actions */}
                       <div className="relative aspect-4/3 bg-[#F7F4EE] overflow-hidden">
@@ -584,8 +571,8 @@ export default function GalleryPage() {
 
                       {/* Card Info Footer */}
                       <div className="p-3 bg-white flex items-center justify-between border-t border-[#F0ECE3] text-[11px] text-[#78716C]">
-                        <span className="truncate max-w-[140px]">
-                          {date ? formatDate(date) : `Photo #${item.id}`}
+                        <span className="truncate max-w-[140px] font-medium text-[#1A1817]">
+                          Photo #{item.id}
                         </span>
 
                         <div className="flex items-center gap-1">
@@ -622,26 +609,23 @@ export default function GalleryPage() {
             /* ── TABLE VIEW ── */
             <div className="bg-white rounded-2xl border border-[#E8E3DA] overflow-hidden shadow-2xs">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#E8E3DA] bg-[#FAF8F5] font-semibold text-[#5C554B]">
-                      <th className="px-4 py-3 w-14">#</th>
-                      <th className="px-4 py-3 w-28">Preview</th>
-                      <th className="px-4 py-3">Item ID</th>
-                      <th className="px-4 py-3">Created Date</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
+                <table className="w-full text-left text-xs text-[#3D372E] border-collapse">
+                  <thead className="bg-[#FAF8F5] border-b border-[#E8E3DA] text-xs uppercase font-semibold text-[#78716C] tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3 w-[6%] min-w-[50px]">#</th>
+                      <th className="px-4 py-3 w-[16%] min-w-[100px]">Preview</th>
+                      <th className="px-4 py-3 w-[44%]">Photo Details</th>
+                      <th className="px-4 py-3 w-[22%] min-w-[120px]">Status</th>
+                      <th className="px-4 py-3 w-[12%] min-w-[90px] text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F0ECE3]">
-                    {filteredItems.map((item, index) => {
+                    {items.map((item, index) => {
                       const imageField = item.gallery_image || item.image || item.photo || item.gallery || item.file_name || item.gallery_photo || item.image_name;
                       const imageUrl = resolveImageUrl(imageField, item);
                       const status = item.gallery_status || item.status || 'Active';
                       const isActive = status === 'Active';
                       const rowNumber = (currentPage - 1) * perPage + index + 1;
-                      const date = item.created_at || item.createdDate || item.date;
-
                       return (
                         <tr key={item.id || index} className="hover:bg-[#FAF8F5] transition-colors">
                           <td className="px-4 py-3 font-mono text-xs text-[#9C9488]">{rowNumber}</td>
@@ -667,14 +651,18 @@ export default function GalleryPage() {
                             </div>
                           </td>
 
-                          {/* Item ID */}
-                          <td className="px-4 py-3 font-mono text-xs font-semibold text-[#1A1817]">
-                            #{item.id}
-                          </td>
-
-                          {/* Created Date */}
-                          <td className="px-4 py-3 text-[#78716C]">
-                            {formatDate(date)}
+                          {/* Photo Details */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-xs text-[#1A1817] whitespace-nowrap">
+                                Photo #{item.id}
+                              </span>
+                              {item.gallery_image && (
+                                <span className="text-[11px] text-[#8C8275] bg-[#F4EFE6] px-2 py-0.5 rounded font-mono truncate max-w-[200px]">
+                                  {item.gallery_image}
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Status Pill Toggle */}
@@ -683,27 +671,27 @@ export default function GalleryPage() {
                               type="button"
                               onClick={() => handleToggleStatus(item)}
                               title="Click to toggle status"
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all cursor-pointer ${
                                 isActive
-                                  ? 'bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB] hover:bg-[#D4EDDA]'
-                                  : 'bg-[#FBEAEA] text-[#9A2D2D] border border-[#F5C6CB] hover:bg-[#F8D7DA]'
+                                  ? 'bg-[#EDF7EE] text-[#1E6B34] border-[#C6E6CC] hover:bg-[#DFF0E1]'
+                                  : 'bg-[#FDF0F0] text-[#9A2D2D] border-[#F6C8C8] hover:bg-[#FBE4E4]'
                               }`}
                             >
                               <span
-                                className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-[#1E7E34]' : 'bg-[#9A2D2D]'}`}
+                                className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-[#1E6B34]' : 'bg-[#9A2D2D]'}`}
                               />
-                              {status}
+                              <span>{status}</span>
                             </button>
                           </td>
 
                           {/* Action Buttons (View & Edit only) */}
                           <td className="px-4 py-3 text-right">
-                            <div className="inline-flex items-center gap-1.5">
+                            <div className="flex items-center justify-end gap-1">
                               <button
                                 type="button"
                                 onClick={() => handleOpenPreview(item)}
                                 title="View Full Photo"
-                                className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
+                                className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
                               >
                                 <Eye className="h-3.5 w-3.5" />
                               </button>
@@ -712,9 +700,9 @@ export default function GalleryPage() {
                                 type="button"
                                 onClick={() => handleOpenEditModal(item)}
                                 title="Edit Photo"
-                                className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
+                                className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
                               >
-                                <Edit2 className="h-3.5 w-3.5 text-[#9E7432]" />
+                                <Edit2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
                           </td>
