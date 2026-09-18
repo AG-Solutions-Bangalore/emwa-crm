@@ -77,3 +77,37 @@ select::placeholder {
   font-family: 'Inter', system-ui, sans-serif;
   color: #9C9488 !important;
 }
+
+/* CKEditor 5 Custom Theme & Layout */
+.ck-editor__editable_inline {
+  min-height: 220px !important;
+  max-height: 400px !important;
+  overflow-y: auto !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 13px !important;
+  color: #1A1817 !important;
+  background-color: #FFFFFF !important;
+  padding: 1rem !important;
+}
+
+.ck.ck-editor__main > .ck-editor__editable:not(.ck-focused) {
+  border-color: #E2DDD5 !important;
+}
+
+.ck.ck-editor__main > .ck-editor__editable.ck-focused {
+  border-color: #C99C4B !important;
+  box-shadow: 0 0 0 1px #C99C4B !important;
+}
+
+.ck.ck-toolbar {
+  background-color: #FAF8F5 !important;
+  border-color: #E2DDD5 !important;
+  border-top-left-radius: 0.75rem !important;
+  border-top-right-radius: 0.75rem !important;
+}
+
+.ck.ck-editor__main > .ck-editor__editable {
+  border-bottom-left-radius: 0.75rem !important;
+  border-bottom-right-radius: 0.75rem !important;
+}
+

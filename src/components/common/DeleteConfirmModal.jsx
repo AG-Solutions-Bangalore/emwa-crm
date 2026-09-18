@@ -5,7 +5,12 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, title = 'Delete Item',
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in"
+    >
       <div className="w-full max-w-sm rounded-2xl border border-[#E8E3DA] bg-[#FCFBFA] p-6 shadow-2xl text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#FDF0F0] text-[#9A2D2D] border border-[#F6C8C8]">
           <Trash2 className="h-5 w-5" />

@@ -39,87 +39,101 @@ export default function EnquiryDetailsModal({ isOpen, onClose, enquiry, loading 
   const createdAt = enquiry?.created_at || enquiry?.createdDate || enquiry?.enquiryCreatedDate;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
-      <div className="w-full max-w-lg rounded-2xl border border-[#E8E3DA] bg-[#FCFBFA] p-6 sm:p-7 shadow-2xl relative">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-fade-in overflow-y-auto"
+    >
+      <div className="w-full max-w-lg rounded-2xl border border-[#E8E3DA] bg-[#FCFBFA] shadow-2xl relative my-auto flex flex-col max-h-[90vh] overflow-hidden">
         
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 p-1.5 rounded-full text-[#8C8275] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E3DA] bg-[#FAF8F5] rounded-t-2xl flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center flex-shrink-0">
+              <MessageSquare className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-display text-base sm:text-lg font-bold text-[#1A1817] tracking-tight">
+                Enquiry #{enquiry?.id || ''}
+              </h3>
+              <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium border mt-0.5 ${getStatusBadge(status)}`}>
+                {status}
+              </span>
+            </div>
+          </div>
 
-        <div className="flex items-center gap-3.5 mb-6 pb-4 border-b border-[#E8E3DA]">
-          <div className="h-10 w-10 rounded-xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center">
-            <MessageSquare className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="font-display text-lg font-bold text-[#1A1817] tracking-tight">
-              Enquiry #{enquiry?.id || ''}
-            </h3>
-            <span className={`inline-block px-3 py-0.5 rounded-full text-xs font-medium border mt-1 ${getStatusBadge(status)}`}>
-              {status}
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close modal"
+            className="p-2 rounded-xl text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] border border-[#E2DDD5] bg-white transition cursor-pointer shadow-2xs flex-shrink-0"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        {loading ? (
-          <div className="py-12 text-center text-[#78716C]">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#1A1817] border-t-transparent mx-auto mb-2" />
-            <span className="text-xs">Fetching enquiry details...</span>
-          </div>
-        ) : (
-          <div className="space-y-4 text-xs">
-            <div className="grid grid-cols-2 gap-3.5">
-              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Customer Name</span>
-                <span className="font-semibold text-[#1A1817] text-sm">{name}</span>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Mobile</span>
-                <span className="font-semibold text-[#1A1817] text-sm">{mobile}</span>
-              </div>
+        {/* Scrollable Body */}
+        <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
+          {loading ? (
+            <div className="py-12 text-center text-[#78716C]">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#1A1817] border-t-transparent mx-auto mb-2" />
+              <span className="text-xs">Fetching enquiry details...</span>
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Customer Name</span>
+                  <span className="font-semibold text-[#1A1817] text-sm">{name}</span>
+                </div>
 
-            <div className="grid grid-cols-2 gap-3.5">
-              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Email</span>
-                <span className="font-semibold text-[#1A1817] text-sm break-all">{email}</span>
+                <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Mobile</span>
+                  <span className="font-semibold text-[#1A1817] text-sm">{mobile}</span>
+                </div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Occasion / Event</span>
-                <span className="font-semibold text-[#1A1817] text-sm">{occasion}</span>
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Email</span>
+                  <span className="font-semibold text-[#1A1817] text-sm break-all">{email}</span>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Occasion / Event</span>
+                  <span className="font-semibold text-[#1A1817] text-sm">{occasion}</span>
+                </div>
               </div>
+
+              {weddingDate && (
+                <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Event / Wedding Date</span>
+                  <span className="font-semibold text-[#1A1817] text-sm">{formatDate(weddingDate)}</span>
+                </div>
+              )}
+
+              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Customer Message</span>
+                <p className="text-[#3D372E] text-sm leading-relaxed whitespace-pre-wrap">{message}</p>
+              </div>
+
+              {createdAt && (
+                <div className="flex items-center gap-1.5 text-[#8C8275] text-xs pt-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>Submitted on {formatDate(createdAt)}</span>
+                </div>
+              )}
             </div>
+          )}
+        </div>
 
-            {weddingDate && (
-              <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Event / Wedding Date</span>
-                <span className="font-semibold text-[#1A1817] text-sm">{formatDate(weddingDate)}</span>
-              </div>
-            )}
-
-            <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-              <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Customer Message</span>
-              <p className="text-[#3D372E] text-sm leading-relaxed whitespace-pre-wrap">{message}</p>
-            </div>
-
-            {createdAt && (
-              <div className="flex items-center gap-1.5 text-[#8C8275] text-xs pt-1">
-                <Clock className="h-3.5 w-3.5" />
-                <span>Submitted on {formatDate(createdAt)}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="mt-7 pt-4 border-t border-[#E8E3DA] flex justify-end">
+        {/* Sticky Footer */}
+        <div className="px-6 py-3.5 bg-[#FAF8F5] border-t border-[#E8E3DA] flex justify-end rounded-b-2xl flex-shrink-0">
           <button
+            type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl border border-[#DDD7CD] bg-[#FAF8F5] hover:bg-[#EFECE6] text-xs font-medium text-[#4A443D] transition cursor-pointer"
+            className="px-5 py-2 rounded-xl border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-xs font-medium text-[#4A443D] transition cursor-pointer shadow-2xs"
           >
             Close
           </button>

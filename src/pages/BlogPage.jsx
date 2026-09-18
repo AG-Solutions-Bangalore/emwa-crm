@@ -1,22 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import BlogModal from '../components/blog/BlogModal';
-import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import Pagination from '../components/common/Pagination';
 import { 
   getBlogs, 
   getBlogById, 
   createBlog, 
   updateBlog, 
-  updateBlogStatus, 
-  deleteBlog 
+  updateBlogStatus 
 } from '../services/blogApi';
 import { 
   Plus, 
   Search, 
   Edit2, 
-  Trash2, 
   RefreshCw, 
   FileText, 
   Image as ImageIcon,
@@ -36,8 +33,17 @@ function extractList(response) {
   return [];
 }
 
+function slugify(text) {
+  return String(text || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function formatDate(dateStr) {
-  if (!dateStr) return '—';
+  if (!dateStr) return null;
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return String(dateStr);
   return d.toLocaleDateString('en-IN', {
@@ -68,6 +74,7 @@ export default function BlogPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [imageBaseUrl, setImageBaseUrl] = useState('https://easemarketing.in/emwaapi/public/assets/images/blog_images/');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -83,11 +90,6 @@ export default function BlogPage() {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(initialForm);
 
-  // Delete Modal State
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
-  const [deleting, setDeleting] = useState(false);
-
   /* ── 1. GET /blog with pagination ── */
   const fetchBlogs = async (page = currentPage, query = searchQuery, status = statusFilter) => {
     setLoading(true);
@@ -101,6 +103,14 @@ export default function BlogPage() {
       const res = await getBlogs(params);
       const list = extractList(res);
       setItems(list);
+
+      // Extract image base URL from API response
+      if (Array.isArray(res?.image_url)) {
+        const blogImg = res.image_url.find((img) => img.image_for?.toLowerCase() === 'blog');
+        if (blogImg?.image_url) {
+          setImageBaseUrl(blogImg.image_url);
+        }
+      }
 
       // Extract pagination metadata
       const paginationObj = res?.data?.data ? res?.data : res;
@@ -157,6 +167,28 @@ export default function BlogPage() {
       if (editingId) {
         const res = await updateBlog(editingId, form);
         toast.success(res?.message || 'Blog updated successfully.');
+
+        // Optimistically update image in table if a file was uploaded
+        if (form.blog_banner_image instanceof File) {
+          const localBlobUrl = URL.createObjectURL(form.blog_banner_image);
+          setItems((prev) =>
+            prev.map((it) =>
+              it.id === editingId
+                ? {
+                    ...it,
+                    blog_title: form.blog_title,
+                    blog_slug: form.blog_slug,
+                    blog_short_description: form.blog_short_description,
+                    blog_banner_image: localBlobUrl,
+                    banner_image: localBlobUrl,
+                    image: localBlobUrl,
+                    banner_image_url: localBlobUrl,
+                    updated_at: new Date().toISOString(),
+                  }
+                : it
+            )
+          );
+        }
       } else {
         const res = await createBlog(form);
         toast.success(res?.message || 'Blog published successfully.');
@@ -165,7 +197,7 @@ export default function BlogPage() {
       setIsModalOpen(false);
       setEditingId(null);
       setForm(initialForm);
-      fetchBlogs(currentPage, searchQuery, statusFilter);
+      await fetchBlogs(currentPage, searchQuery, statusFilter);
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to save blog post.');
     } finally {
@@ -175,45 +207,68 @@ export default function BlogPage() {
 
   /* ── 3. EDIT (GET /blog/{id}) ── */
   const handleOpenEdit = async (id) => {
+    const tableItem = items.find((i) => i.id === id);
+    const cleanBase = imageBaseUrl.endsWith('/') ? imageBaseUrl : `${imageBaseUrl}/`;
+
+    const resolveItemImg = (img) => {
+      if (!img) return null;
+      if (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('blob:') || img.startsWith('data:')) {
+        return img;
+      }
+      return `${cleanBase}${img.startsWith('/') ? img.slice(1) : img}`;
+    };
+
+    // Open immediately with local table data for instantaneous response
+    if (tableItem) {
+      const initialImg = tableItem.blog_banner_image || tableItem.banner_image || tableItem.image || tableItem.banner_image_url;
+      setEditingId(id);
+      setForm({
+        blog_title: tableItem.blog_title || tableItem.title || tableItem.name || '',
+        blog_slug: tableItem.blog_slug || tableItem.slug || slugify(tableItem.blog_title || ''),
+        blog_short_description: tableItem.blog_short_description || tableItem.short_description || '',
+        blog_description: tableItem.blog_description || tableItem.description || '',
+        blog_categories_ids: tableItem.blog_categories_ids || tableItem.category_id || '',
+        blog_banner_image: null,
+        blog_banner_image_alt: tableItem.blog_banner_image_alt || tableItem.banner_image_alt || '',
+        blog_meta_keywords: tableItem.blog_meta_keywords || tableItem.meta_keywords || '',
+        blog_status: tableItem.blog_status || tableItem.status || 'Active',
+        blog_index: String(tableItem.blog_index ?? '1'),
+        blog_front: String(tableItem.blog_front ?? '0'),
+        blog_featured: String(tableItem.blog_featured ?? '0'),
+        banner_image_url: resolveItemImg(initialImg),
+      });
+      setIsModalOpen(true);
+    }
+
     try {
       const res = await getBlogById(id);
       const data = res?.data?.data || res?.data || res?.blog || res || {};
+      const title = data?.blog_title || data?.title || data?.name || tableItem?.blog_title || '';
+      const slug = data?.blog_slug || data?.slug || data?.url_slug || data?.article_slug || tableItem?.blog_slug || slugify(title);
+      const rawImg = data?.blog_banner_image || data?.banner_image || data?.image || data?.banner_image_url || (tableItem?.blog_banner_image || tableItem?.banner_image || tableItem?.image);
+      const fullImgUrl = resolveItemImg(rawImg);
+
       setEditingId(id);
       setForm({
-        blog_title: data?.blog_title || data?.title || '',
-        blog_slug: data?.blog_slug || data?.slug || '',
-        blog_short_description: data?.blog_short_description || data?.short_description || '',
-        blog_description: data?.blog_description || data?.description || '',
-        blog_categories_ids: data?.blog_categories_ids || data?.category_id || '',
+        blog_title: title,
+        blog_slug: slug,
+        blog_short_description: data?.blog_short_description || data?.short_description || data?.excerpt || tableItem?.blog_short_description || '',
+        blog_description: data?.blog_description || data?.description || data?.content || tableItem?.blog_description || '',
+        blog_categories_ids: data?.blog_categories_ids || data?.category_id || data?.categories_id || tableItem?.blog_categories_ids || '',
         blog_banner_image: null,
-        blog_banner_image_alt: data?.blog_banner_image_alt || data?.banner_image_alt || '',
-        blog_meta_keywords: data?.blog_meta_keywords || data?.meta_keywords || '',
-        blog_status: data?.blog_status || data?.status || 'Active',
-        blog_index: String(data?.blog_index ?? '1'),
-        blog_front: String(data?.blog_front ?? '0'),
-        blog_featured: String(data?.blog_featured ?? '0'),
-        banner_image_url: data?.blog_banner_image || data?.banner_image || null,
+        blog_banner_image_alt: data?.blog_banner_image_alt || data?.banner_image_alt || data?.alt_text || tableItem?.blog_banner_image_alt || '',
+        blog_meta_keywords: data?.blog_meta_keywords || data?.meta_keywords || data?.keywords || tableItem?.blog_meta_keywords || '',
+        blog_status: data?.blog_status || data?.status || tableItem?.blog_status || 'Active',
+        blog_index: String(data?.blog_index ?? data?.index ?? tableItem?.blog_index ?? '1'),
+        blog_front: String(data?.blog_front ?? data?.front ?? data?.is_home ?? tableItem?.blog_front ?? '0'),
+        blog_featured: String(data?.blog_featured ?? data?.featured ?? data?.is_featured ?? tableItem?.blog_featured ?? '0'),
+        banner_image_url: fullImgUrl,
       });
       setIsModalOpen(true);
     } catch (err) {
-      const fallback = items.find((i) => i.id === id);
-      setEditingId(id);
-      setForm({
-        blog_title: fallback?.blog_title || fallback?.title || '',
-        blog_slug: fallback?.blog_slug || fallback?.slug || '',
-        blog_short_description: fallback?.blog_short_description || fallback?.short_description || '',
-        blog_description: fallback?.blog_description || fallback?.description || '',
-        blog_categories_ids: fallback?.blog_categories_ids || fallback?.category_id || '',
-        blog_banner_image: null,
-        blog_banner_image_alt: fallback?.blog_banner_image_alt || fallback?.banner_image_alt || '',
-        blog_meta_keywords: fallback?.blog_meta_keywords || fallback?.meta_keywords || '',
-        blog_status: fallback?.blog_status || fallback?.status || 'Active',
-        blog_index: String(fallback?.blog_index ?? '1'),
-        blog_front: String(fallback?.blog_front ?? '0'),
-        blog_featured: String(fallback?.blog_featured ?? '0'),
-        banner_image_url: fallback?.blog_banner_image || fallback?.banner_image || null,
-      });
-      setIsModalOpen(true);
+      if (!tableItem) {
+        toast.error('Could not load article details.');
+      }
     }
   };
 
@@ -252,23 +307,16 @@ export default function BlogPage() {
     }
   };
 
-  /* ── 5. DELETE /blog/{id} ── */
-  const handleConfirmDelete = async () => {
-    if (!deletingId) return;
-    setDeleting(true);
-    try {
-      const res = await deleteBlog(deletingId);
-      toast.success(res?.message || 'Blog deleted successfully.');
-      setItems((prev) => prev.filter((item) => item.id !== deletingId));
-      setDeleteModalOpen(false);
-      fetchBlogs(currentPage, searchQuery, statusFilter);
-    } catch (err) {
-      toast.error(err?.response?.data?.message || 'Failed to delete blog.');
-    } finally {
-      setDeleting(false);
-      setDeletingId(null);
-    }
-  };
+  // Filter blogs based on status
+  const displayedItems = useMemo(() => {
+    return items.filter((item) => {
+      const status = item.blog_status || item.status || 'Active';
+      if (statusFilter !== 'All' && status.toLowerCase() !== statusFilter.toLowerCase()) {
+        return false;
+      }
+      return true;
+    });
+  }, [items, statusFilter]);
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F0] text-[#1A1817]">
@@ -351,7 +399,7 @@ export default function BlogPage() {
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#1A1817] border-t-transparent mx-auto mb-2" />
                 <p className="text-xs font-medium">Loading articles...</p>
               </div>
-            ) : items.length === 0 ? (
+            ) : displayedItems.length === 0 ? (
               <div className="py-14 text-center text-[#78716C]">
                 <div className="h-10 w-10 rounded-xl bg-[#F7F4EE] flex items-center justify-center mx-auto mb-2.5 text-[#9C9488]">
                   <FileText className="h-5 w-5" />
@@ -377,16 +425,41 @@ export default function BlogPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F0ECE3]">
-                      {items.map((item, index) => {
+                      {displayedItems.map((item, index) => {
                         const id = item.id;
-                        const title = item.blog_title || item.title || 'Untitled Article';
-                        const slug = item.blog_slug || item.slug || '—';
-                        const image = item.blog_banner_image || item.banner_image;
+                        const title = item.blog_title || item.blog_meta_title || item.title || item.name || 'Untitled Article';
+                        const rawSlug = item.blog_slug || item.slug || item.url_slug || item.article_slug || item.url || '';
+                        const slug = rawSlug && rawSlug !== '—' ? rawSlug : slugify(title);
+                        const rawImg = item.blog_banner_image || item.banner_image || item.image || item.banner_image_url;
+                        const cleanBase = imageBaseUrl.endsWith('/') ? imageBaseUrl : `${imageBaseUrl}/`;
+                        const image = rawImg
+                          ? (rawImg.startsWith('data:') || rawImg.startsWith('blob:')
+                              ? rawImg
+                              : rawImg.startsWith('http')
+                                ? `${rawImg}${rawImg.includes('?') ? '&' : '?'}t=${item.updated_at ? new Date(item.updated_at).getTime() : index}`
+                                : `${cleanBase}${rawImg.startsWith('/') ? rawImg.slice(1) : rawImg}?t=${item.updated_at ? new Date(item.updated_at).getTime() : index}`)
+                          : null;
                         const status = item.blog_status || item.status || 'Active';
-                        const isFeatured = String(item.blog_featured) === '1' || item.blog_featured === 'Active';
-                        const isFront = String(item.blog_front) === '1' || item.blog_front === 'Active';
+                        const isFeatured = String(item.blog_featured) === '1' || item.blog_featured === 'Active' || item.blog_featured === true || String(item.featured) === '1';
+                        const isFront = String(item.blog_front) === '1' || item.blog_front === 'Active' || item.blog_front === true || String(item.front) === '1' || String(item.is_home) === '1';
                         const isActive = status === 'Active';
-                        const date = item.created_at || item.createdDate || item.date;
+                        const date = 
+                          item.blog_created_date ||
+                          item.blog_updated_date ||
+                          item.created_at ||
+                          item.createdAt ||
+                          item.created_date ||
+                          item.createdDate ||
+                          item.date ||
+                          item.blog_date ||
+                          item.publish_date ||
+                          item.published_at ||
+                          item.publishedAt ||
+                          item.post_date ||
+                          item.added_on ||
+                          item.updated_at ||
+                          item.updatedAt;
+                        const formattedDate = formatDate(date) || formatDate(new Date());
                         const rowNumber = (currentPage - 1) * perPage + index + 1;
 
                         return (
@@ -410,9 +483,9 @@ export default function BlogPage() {
                                 )}
                                 <div className="min-w-0 max-w-xs">
                                   <span className="text-xs font-medium text-[#1A1817] block truncate">{title}</span>
-                                  {item.blog_short_description && (
+                                  {(item.blog_short_description || item.short_description) && (
                                     <span className="text-[11px] text-[#8C8275] block truncate mt-0.5">
-                                      {item.blog_short_description}
+                                      {item.blog_short_description || item.short_description}
                                     </span>
                                   )}
                                 </div>
@@ -446,7 +519,7 @@ export default function BlogPage() {
                             </td>
 
                             <td className="px-4 py-3 text-xs text-[#78716C] whitespace-nowrap">
-                              {formatDate(date)}
+                              {formattedDate}
                             </td>
 
                             {/* Status Pill & Quick Toggle */}
@@ -474,17 +547,6 @@ export default function BlogPage() {
                                   className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />
-                                </button>
-
-                                <button
-                                  onClick={() => {
-                                    setDeletingId(id);
-                                    setDeleteModalOpen(true);
-                                  }}
-                                  title="Delete Article"
-                                  className="p-1.5 rounded-lg text-[#78716C] hover:text-[#9A2D2D] hover:bg-[#FDF0F0] transition cursor-pointer"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             </td>
@@ -524,19 +586,7 @@ export default function BlogPage() {
         setForm={setForm}
         editingId={editingId}
         submitting={submitting}
-      />
-
-      {/* Delete Confirmation Modal */}
-      <DeleteConfirmModal
-        isOpen={deleteModalOpen}
-        onClose={() => {
-          setDeleteModalOpen(false);
-          setDeletingId(null);
-        }}
-        onConfirm={handleConfirmDelete}
-        title="Delete Blog Article"
-        message="Are you sure you want to delete this blog post? This will remove the article from your website."
-        submitting={deleting}
+        imageBaseUrl={imageBaseUrl}
       />
     </div>
   );

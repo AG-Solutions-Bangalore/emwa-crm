@@ -1,22 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import CategoryModal from '../components/category/CategoryModal';
-import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import Pagination from '../components/common/Pagination';
 import { 
   getCategories, 
   getCategoryById, 
   createCategory, 
   updateCategory, 
-  updateCategoryStatus, 
-  deleteCategory 
+  updateCategoryStatus 
 } from '../services/categoryApi';
 import { 
   Plus, 
   Search, 
   Edit2, 
-  Trash2, 
   RefreshCw, 
   Layers
 } from 'lucide-react';
@@ -51,11 +48,6 @@ export default function CategoryPage() {
   const [editingId, setEditingId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ category_name: '', category_status: 'Active' });
-
-  // Delete Modal State
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
-  const [deleting, setDeleting] = useState(false);
 
   /* ── 1. GET /category with pagination ── */
   const fetchCategories = async (page = currentPage, query = searchQuery, status = statusFilter) => {
@@ -205,23 +197,16 @@ export default function CategoryPage() {
     }
   };
 
-  /* ── 5. DELETE /category/{id} ── */
-  const handleConfirmDelete = async () => {
-    if (!deletingId) return;
-    setDeleting(true);
-    try {
-      const res = await deleteCategory(deletingId);
-      toast.success(res?.message || 'Category deleted successfully.');
-      setItems((prev) => prev.filter((item) => item.id !== deletingId));
-      setDeleteModalOpen(false);
-      fetchCategories(currentPage, searchQuery, statusFilter);
-    } catch (err) {
-      toast.error(err?.response?.data?.message || 'Failed to delete category.');
-    } finally {
-      setDeleting(false);
-      setDeletingId(null);
-    }
-  };
+  // Filter categories by status
+  const displayedItems = useMemo(() => {
+    return items.filter((item) => {
+      const status = item.category_status || item.categories_status || item.status || 'Active';
+      if (statusFilter !== 'All' && status.toLowerCase() !== statusFilter.toLowerCase()) {
+        return false;
+      }
+      return true;
+    });
+  }, [items, statusFilter]);
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F0] text-[#1A1817]">
@@ -304,7 +289,7 @@ export default function CategoryPage() {
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#1A1817] border-t-transparent mx-auto mb-2" />
                 <p className="text-xs font-medium">Loading categories...</p>
               </div>
-            ) : items.length === 0 ? (
+            ) : displayedItems.length === 0 ? (
               <div className="py-14 text-center text-[#78716C]">
                 <div className="h-10 w-10 rounded-xl bg-[#F7F4EE] flex items-center justify-center mx-auto mb-2.5 text-[#9C9488]">
                   <Layers className="h-5 w-5" />
@@ -327,7 +312,7 @@ export default function CategoryPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F0ECE3]">
-                      {items.map((item, index) => {
+                      {displayedItems.map((item, index) => {
                         const id = item.id;
                         const name = item.category_name || item.categories || item.name || 'Unnamed Category';
                         const status = item.category_status || item.categories_status || item.status || 'Active';
@@ -373,17 +358,6 @@ export default function CategoryPage() {
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </button>
-
-                                <button
-                                  onClick={() => {
-                                    setDeletingId(id);
-                                    setDeleteModalOpen(true);
-                                  }}
-                                  title="Delete Category"
-                                  className="p-1.5 rounded-lg text-[#78716C] hover:text-[#9A2D2D] hover:bg-[#FDF0F0] transition cursor-pointer"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
                               </div>
                             </td>
                           </tr>
@@ -422,19 +396,6 @@ export default function CategoryPage() {
         onChange={handleFormChange}
         editingId={editingId}
         submitting={submitting}
-      />
-
-      {/* Delete Confirmation Modal */}
-      <DeleteConfirmModal
-        isOpen={deleteModalOpen}
-        onClose={() => {
-          setDeleteModalOpen(false);
-          setDeletingId(null);
-        }}
-        onConfirm={handleConfirmDelete}
-        title="Delete Category"
-        message="Are you sure you want to delete this category? Products linked to this category may be affected."
-        submitting={deleting}
       />
     </div>
   );
