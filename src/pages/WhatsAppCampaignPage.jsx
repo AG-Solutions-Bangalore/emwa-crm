@@ -5,7 +5,6 @@ import WhatsAppCampaignModal from '../components/campaign/WhatsAppCampaignModal'
 import WhatsAppCampaignViewModal from '../components/campaign/WhatsAppCampaignViewModal';
 import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import {
   getWhatsAppCampaigns,
@@ -374,16 +373,6 @@ export default function WhatsAppCampaignPage() {
                 className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
-
-            <StatusFilterToggle
-              options={['All', 'Pending', 'Sent', 'Hold']}
-              value={statusFilter}
-              onChange={(status) => {
-                setStatusFilter(status);
-                setCurrentPage(1);
-              }}
-            />
-
           </div>
 
           {/* Campaigns Table */}

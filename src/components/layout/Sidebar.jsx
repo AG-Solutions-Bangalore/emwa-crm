@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { useAuthContext } from '../../context/AuthContext';
@@ -6,51 +6,62 @@ import LogoutConfirmModal from '../common/LogoutConfirmModal';
 import { 
   LayoutDashboard, 
   Layers,
-  Boxes,
-  Users,
-  CalendarDays,
-  LayoutTemplate,
-  Workflow,
-  Send,
-  MailCheck,
-  FileText,
   Image as ImageIcon,
+  Building2,
   HelpCircle,
   Quote,
-  Building2,
+  FileText,
   MessageSquareText,
   Mail,
+  Boxes,
+  Users,
+  LayoutTemplate,
+  Workflow,
+  MailCheck,
+  Send,
   LogOut,
   PanelLeft
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const navItems = [
-  { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
-  { label: 'Categories', to: '/category', icon: Layers },
-  { label: 'Groups', to: '/group', icon: Boxes },
-  { label: 'Contacts', to: '/contact', icon: Users },
-  { label: 'Holidays', to: '/holiday', icon: CalendarDays },
-  { label: 'Templates', to: '/template', icon: LayoutTemplate },
-  { label: 'Pipelines', to: '/pipeline', icon: Workflow },
-  { label: 'WhatsApp Campaigns', to: '/whatsapp-campaign', icon: Send },
-  { label: 'Email Campaigns', to: '/email-campaign', icon: MailCheck },
-  { label: 'Blogs', to: '/blog', icon: FileText },
+const dashboardItem = { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard };
+
+const websiteNavItems = [
+  { label: 'Category', to: '/category', icon: Layers },
   { label: 'Gallery', to: '/gallery', icon: ImageIcon },
-  { label: 'FAQs', to: '/faq', icon: HelpCircle },
-  { label: 'Testimonials', to: '/testimonial', icon: Quote },
-  { label: 'Clients', to: '/client', icon: Building2 },
-  { label: 'Company', to: '/company', icon: Building2 },
+  { label: 'Client', to: '/client', icon: Building2 },
+  { label: 'FAQ', to: '/faq', icon: HelpCircle },
+  { label: 'Testimonial', to: '/testimonial', icon: Quote },
+  { label: 'Blogs', to: '/blog', icon: FileText },
   { label: 'Enquiries', to: '/enquiry', icon: MessageSquareText },
   { label: 'Newsletter', to: '/newsletter', icon: Mail },
+];
+
+const marketingNavItems = [
+  { label: 'Groups', to: '/group', icon: Boxes, requires: 'any' },
+  { label: 'Contact', to: '/contact', icon: Users, requires: 'any' },
+  { label: 'Template', to: '/template', icon: LayoutTemplate, requires: 'any' },
+  { label: 'Pipeline', to: '/pipeline', icon: Workflow, requires: 'whatsapp' },
+  { label: 'Email Campaign', to: '/email-campaign', icon: MailCheck, requires: 'email' },
+  { label: 'WhatsApp Campaign', to: '/whatsapp-campaign', icon: Send, requires: 'whatsapp' },
 ];
 
 export const Sidebar = () => {
   const navigate = useNavigate();
   const { companyInfo, companyLogoUrl, isSidebarCollapsed, toggleSidebar } = useAppContext();
-  const { user, logout } = useAuthContext();
+  const { user, logout, hasEmail, hasWhatsApp } = useAuthContext();
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // Filter marketing items according to user channel permissions
+  const visibleMarketingItems = useMemo(() => {
+    return marketingNavItems.filter((item) => {
+      if (item.requires === 'email') return hasEmail;
+      if (item.requires === 'whatsapp') return hasWhatsApp;
+      if (item.requires === 'any') return hasEmail || hasWhatsApp;
+      return true;
+    });
+  }, [hasEmail, hasWhatsApp]);
 
   const handleConfirmLogout = async () => {
     setLoggingOut(true);
@@ -67,6 +78,37 @@ export const Sidebar = () => {
     }
   };
 
+  const renderNavLink = ({ label, to, icon: Icon }) => (
+    <NavLink
+      key={to}
+      to={to}
+      title={isSidebarCollapsed ? label : undefined}
+      className={({ isActive }) =>
+        `flex items-center ${
+          isSidebarCollapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2'
+        } rounded-xl text-sm font-medium transition-all duration-150 ${
+          isActive
+            ? 'bg-[#1A1817] text-[#FAF8F5] shadow-2xs font-semibold'
+            : 'text-[#5C554B] hover:bg-[#EDE8DE] hover:text-[#1A1817]'
+        }`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-[#C99C4B]' : 'text-[#8C8275]'}`} />
+          {!isSidebarCollapsed && (
+            <>
+              <span className="flex-1 tracking-tight text-[13px]">{label}</span>
+              {isActive && (
+                <span className="h-1.5 w-1.5 rounded-full bg-[#C99C4B]" />
+              )}
+            </>
+          )}
+        </>
+      )}
+    </NavLink>
+  );
+
   return (
     <>
       <aside
@@ -80,9 +122,14 @@ export const Sidebar = () => {
             <div className="flex flex-col items-center gap-2 pb-3.5 border-b border-[#E8E3DA]">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-[#E8E3DA] shadow-2xs overflow-hidden p-1">
                 <img
-                  src="/ag-logo-icon.png"
-                  alt="AG Solutions"
+                  src={companyLogoUrl || '/no_image.jpg'}
+                  alt={companyInfo?.company_name || 'Logo'}
                   className="h-full w-full object-contain"
+                  onError={(e) => {
+                    if (e.currentTarget.src !== window.location.origin + '/no_image.jpg') {
+                      e.currentTarget.src = '/no_image.jpg';
+                    }
+                  }}
                 />
               </div>
               <button
@@ -99,9 +146,14 @@ export const Sidebar = () => {
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-[#E8E3DA] shadow-2xs overflow-hidden p-1 shrink-0">
                   <img
-                    src="/ag-logo-icon.png"
-                    alt="AG Solutions"
+                    src={companyLogoUrl || '/no_image.jpg'}
+                    alt={companyInfo?.company_name || 'Logo'}
                     className="h-full w-full object-contain"
+                    onError={(e) => {
+                      if (e.currentTarget.src !== window.location.origin + '/no_image.jpg') {
+                        e.currentTarget.src = '/no_image.jpg';
+                      }
+                    }}
                   />
                 </div>
                 <div className="min-w-0">
@@ -125,39 +177,42 @@ export const Sidebar = () => {
             </div>
           )}
 
-          {/* Clean Navigation Links */}
-          <nav className="mt-3.5 space-y-1 max-h-[calc(100vh-170px)] overflow-y-auto pr-0.5">
-            {navItems.map(({ label, to, exact, icon: Icon }) => (
-              <NavLink
-                key={label}
-                to={to}
-                end={exact}
-                title={isSidebarCollapsed ? label : undefined}
-                className={({ isActive }) =>
-                  `flex items-center ${
-                    isSidebarCollapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3.5 py-2.5'
-                  } rounded-xl text-sm font-medium transition-all duration-150 ${
-                    isActive
-                      ? 'bg-[#1A1817] text-[#FAF8F5] shadow-2xs font-semibold'
-                      : 'text-[#5C554B] hover:bg-[#EDE8DE] hover:text-[#1A1817]'
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <Icon className={`h-4.5 w-4.5 flex-shrink-0 ${isActive ? 'text-[#C99C4B]' : 'text-[#8C8275]'}`} />
-                    {!isSidebarCollapsed && (
-                      <>
-                        <span className="flex-1 tracking-tight text-[13.5px]">{label}</span>
-                        {isActive && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#C99C4B]" />
-                        )}
-                      </>
-                    )}
-                  </>
+          {/* Navigation Links with Section Headings */}
+          <nav className="mt-3 space-y-1 max-h-[calc(100vh-165px)] overflow-y-auto pr-0.5 custom-scrollbar">
+            
+            {/* 1. Dashboard (Top-level) */}
+            {renderNavLink(dashboardItem)}
+
+            {/* 2. WEBSITE Section */}
+            <div className="pt-2">
+              {!isSidebarCollapsed ? (
+                <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#9C9488]">
+                  Website
+                </div>
+              ) : (
+                <div className="my-1.5 border-t border-[#E8E3DA]" />
+              )}
+              <div className="space-y-0.5">
+                {websiteNavItems.map(renderNavLink)}
+              </div>
+            </div>
+
+            {/* 3. MARKETING Section (Conditional based on isEmail / isWhatsApp) */}
+            {visibleMarketingItems.length > 0 && (
+              <div className="pt-2">
+                {!isSidebarCollapsed ? (
+                  <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#9C9488]">
+                    Marketing
+                  </div>
+                ) : (
+                  <div className="my-1.5 border-t border-[#E8E3DA]" />
                 )}
-              </NavLink>
-            ))}
+                <div className="space-y-0.5">
+                  {visibleMarketingItems.map(renderNavLink)}
+                </div>
+              </div>
+            )}
+
           </nav>
         </div>
 

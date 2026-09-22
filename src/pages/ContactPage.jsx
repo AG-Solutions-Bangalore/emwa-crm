@@ -5,7 +5,6 @@ import ContactModal from '../components/contact/ContactModal';
 import ContactImportModal from '../components/contact/ContactImportModal';
 import ContactViewModal from '../components/contact/ContactViewModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import {
@@ -15,6 +14,7 @@ import {
   updateContact,
   updateContactStatus,
 } from '../services/contactApi';
+import { useAuthContext } from '../context/AuthContext';
 import {
   Plus,
   Search,
@@ -54,6 +54,7 @@ const initialForm = {
 };
 
 export default function ContactPage() {
+  const { hasEmail, hasWhatsApp } = useAuthContext();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -187,12 +188,16 @@ export default function ContactPage() {
 
   const handleFormSubmit = async (e) => {
     e?.preventDefault();
-    if (!form.contact_name.trim()) {
+    if (!form.contact_name?.trim()) {
       toast.error('Please enter a contact name.');
       return;
     }
-    if (!form.contact_mobile.trim()) {
+    if (!form.contact_mobile?.trim()) {
       toast.error('Please enter a mobile phone number.');
+      return;
+    }
+    if (!Array.isArray(form.group_ids) || form.group_ids.length === 0) {
+      toast.error('Please select at least one product group.');
       return;
     }
 
@@ -364,16 +369,6 @@ export default function ContactPage() {
                 className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
-
-            <StatusFilterToggle
-              options={['All', 'Active', 'Inactive']}
-              value={statusFilter}
-              onChange={(val) => {
-                setStatusFilter(val);
-                setCurrentPage(1);
-              }}
-            />
-
           </div>
 
           {/* Table List View */}
@@ -409,7 +404,7 @@ export default function ContactPage() {
                     <tr>
                       <th className="px-4 py-2.5 w-14">#</th>
                       <th className="px-4 py-2.5">Contact</th>
-                      <th className="px-4 py-2.5">Mobile</th>
+                      {hasWhatsApp && <th className="px-4 py-2.5">Mobile</th>}
                       <th className="px-4 py-2.5">Address</th>
                       <th className="px-4 py-2.5">Groups</th>
                       <th className="px-4 py-2.5">Status</th>
@@ -440,7 +435,7 @@ export default function ContactPage() {
                               </div>
                               <div className="min-w-0">
                                 <span className="font-semibold text-xs text-[#1A1817] block truncate">{name}</span>
-                                {email && (
+                                {hasEmail && email && (
                                   <span className="text-[11px] text-[#78716C] block truncate">{email}</span>
                                 )}
                               </div>
@@ -448,16 +443,18 @@ export default function ContactPage() {
                           </td>
 
                           {/* Mobile */}
-                          <td className="px-4 py-3">
-                            {mobile ? (
-                              <div className="flex items-center gap-1.5 text-xs text-[#3D372E]">
-                                <Phone className="h-3 w-3 text-[#9E7432]" />
-                                <span className="font-mono text-xs">{mobile}</span>
-                              </div>
-                            ) : (
-                              <span className="text-[#8C8275] text-[11px]">—</span>
-                            )}
-                          </td>
+                          {hasWhatsApp && (
+                            <td className="px-4 py-3">
+                              {mobile ? (
+                                <div className="flex items-center gap-1.5 text-xs text-[#3D372E]">
+                                  <Phone className="h-3 w-3 text-[#9E7432]" />
+                                  <span className="font-mono text-xs">{mobile}</span>
+                                </div>
+                              ) : (
+                                <span className="text-[#8C8275] text-[11px]">—</span>
+                              )}
+                            </td>
+                          )}
 
                           {/* Address */}
                           <td className="px-4 py-3 max-w-xs truncate text-[#5C554B]">

@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, User, Mail, Phone, MapPin, Boxes, Edit2, Calendar, CheckCircle2, XCircle } from 'lucide-react';
+import { useAuthContext } from '../../context/AuthContext';
 
 export default function ContactViewModal({
   isOpen,
@@ -7,6 +8,7 @@ export default function ContactViewModal({
   item,
   onEdit,
 }) {
+  const { hasEmail, hasWhatsApp } = useAuthContext();
   if (!isOpen || !item) return null;
 
   const name = item.contact_name || item.name || 'Contact';
@@ -76,40 +78,44 @@ export default function ContactViewModal({
         {/* Contact Info Body */}
         <div className="p-6 space-y-4">
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className={`grid grid-cols-1 ${hasEmail && hasWhatsApp ? 'sm:grid-cols-2' : ''} gap-3`}>
             {/* Phone */}
-            <div className="p-3.5 bg-[#FAF8F5] rounded-xl border border-[#E8E3DA]">
-              <span className="text-[10px] font-semibold tracking-wider text-[#8C8275] uppercase block mb-1">
-                Phone / Mobile
-              </span>
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-[#9E7432]" />
-                {mobile ? (
-                  <a href={`tel:${mobile}`} className="text-xs font-semibold text-[#1A1817] hover:underline">
-                    {mobile}
-                  </a>
-                ) : (
-                  <span className="text-xs text-[#8C8275]">—</span>
-                )}
+            {hasWhatsApp && (
+              <div className="p-3.5 bg-[#FAF8F5] rounded-xl border border-[#E8E3DA]">
+                <span className="text-[10px] font-semibold tracking-wider text-[#8C8275] uppercase block mb-1">
+                  Phone / Mobile
+                </span>
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-[#9E7432]" />
+                  {mobile ? (
+                    <a href={`tel:${mobile}`} className="text-xs font-semibold text-[#1A1817] hover:underline">
+                      {mobile}
+                    </a>
+                  ) : (
+                    <span className="text-xs text-[#8C8275]">—</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Email */}
-            <div className="p-3.5 bg-[#FAF8F5] rounded-xl border border-[#E8E3DA]">
-              <span className="text-[10px] font-semibold tracking-wider text-[#8C8275] uppercase block mb-1">
-                Email Address
-              </span>
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-[#9E7432]" />
-                {email ? (
-                  <a href={`mailto:${email}`} className="text-xs font-semibold text-[#1A1817] hover:underline truncate">
-                    {email}
-                  </a>
-                ) : (
-                  <span className="text-xs text-[#8C8275]">—</span>
-                )}
+            {hasEmail && (
+              <div className="p-3.5 bg-[#FAF8F5] rounded-xl border border-[#E8E3DA]">
+                <span className="text-[10px] font-semibold tracking-wider text-[#8C8275] uppercase block mb-1">
+                  Email Address
+                </span>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-[#9E7432]" />
+                  {email ? (
+                    <a href={`mailto:${email}`} className="text-xs font-semibold text-[#1A1817] hover:underline truncate">
+                      {email}
+                    </a>
+                  ) : (
+                    <span className="text-xs text-[#8C8275]">—</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Address */}

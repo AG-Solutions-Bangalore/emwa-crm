@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import { 
@@ -23,18 +24,11 @@ import {
 } from 'lucide-react';
 import { 
   getEmailCampaigns, 
-  createEmailCampaign, 
-  updateEmailCampaign, 
   updateEmailCampaignStatus, 
   deleteEmailCampaign,
-  getEmailCampaignById
 } from '../services/emailCampaignApi';
-import EmailCampaignModal from '../components/campaign/EmailCampaignModal';
-import EmailCampaignViewModal from '../components/campaign/EmailCampaignViewModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
-import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import useDebounce from '../hooks/useDebounce';
 import toast from 'react-hot-toast';
 
@@ -49,6 +43,7 @@ function extractList(response) {
 }
 
 export default function EmailCampaignPage() {
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -60,11 +55,7 @@ export default function EmailCampaignPage() {
   // Debounced search query
   const debouncedSearch = useDebounce(search, 350);
 
-  // Modal states
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState(null);
-  const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [viewCampaign, setViewCampaign] = useState(null);
+  // Action states
   const [statusUpdatingId, setStatusUpdatingId] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -109,42 +100,6 @@ export default function EmailCampaignPage() {
   const handleStatusFilterChange = (newStatus) => {
     setStatusFilter(newStatus);
     setCurrentPage(1);
-  };
-
-  const handleOpenCreate = () => {
-    setEditingCampaign(null);
-    setModalOpen(true);
-  };
-
-  const handleOpenEdit = async (campaign) => {
-    try {
-      const detailed = await getEmailCampaignById(campaign.id);
-      setEditingCampaign(detailed?.data || detailed || campaign);
-    } catch {
-      setEditingCampaign(campaign);
-    }
-    setModalOpen(true);
-  };
-
-  const handleOpenView = async (campaign) => {
-    try {
-      const detailed = await getEmailCampaignById(campaign.id);
-      setViewCampaign(detailed?.data || detailed || campaign);
-    } catch {
-      setViewCampaign(campaign);
-    }
-    setViewModalOpen(true);
-  };
-
-  const handleSaveCampaign = async (formData) => {
-    if (editingCampaign) {
-      await updateEmailCampaign(editingCampaign.id, formData);
-      toast.success('Email campaign updated successfully.');
-    } else {
-      await createEmailCampaign(formData);
-      toast.success('Email campaign created successfully.');
-    }
-    fetchCampaigns(currentPage, debouncedSearch, statusFilter);
   };
 
   const handleStatusChange = async (id, newStatus) => {
@@ -253,7 +208,7 @@ export default function EmailCampaignPage() {
               </button>
 
               <button
-                onClick={handleOpenCreate}
+                onClick={() => navigate('/email-campaign/create')}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
@@ -288,13 +243,6 @@ export default function EmailCampaignPage() {
                 className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
-
-            <StatusFilterToggle
-              options={['All', 'Pending', 'Sent', 'Hold']}
-              value={statusFilter}
-              onChange={(tab) => handleStatusFilterChange(tab)}
-            />
-
           </div>
 
       {/* Table Container */}
@@ -308,79 +256,86 @@ export default function EmailCampaignPage() {
         ) : campaigns.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center px-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FAF8F5] border border-[#E8E3DA] text-[#8C8275] mb-3">
-              <Mail className="h-6 w-6" />
+              <Mail className="h-6 w-6 text-[#9E7432]" />
             </div>
-            <h3 className="text-sm font-semibold text-[#1A1817]">No email campaigns found</h3>
-            <p className="text-xs text-[#8C8275] mt-1 max-w-sm">
+            <p className="text-xs font-semibold text-[#1A1817]">No email campaigns found</p>
+            <p className="text-[11px] text-[#8C8275] mt-0.5 max-w-xs mb-4">
               {search || statusFilter !== 'All'
-                ? 'No campaigns match your active search or status filters.'
-                : 'Get started by creating your first broadcast marketing email campaign.'}
+                ? 'Try adjusting your search terms or filter selection.'
+                : 'Get started by scheduling your first email marketing campaign broadcast.'}
             </p>
-            {!search && statusFilter === 'All' && (
-              <button
-                onClick={handleOpenCreate}
-                className="mt-4 flex items-center gap-2 rounded-xl bg-[#1A1817] px-4 py-2 text-xs font-semibold text-[#FAF8F5] hover:bg-[#2E2A27] transition shadow-2xs cursor-pointer"
-              >
-                <Plus className="h-4 w-4 text-[#C99C4B]" />
-                <span>Create Email Campaign</span>
-              </button>
-            )}
+            <button
+              onClick={() => navigate('/email-campaign/create')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1A1817] text-[#FAF8F5] text-xs font-medium shadow-xs hover:bg-[#2C2825] transition cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
+              <span>Create Campaign</span>
+            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-[#E8E3DA] bg-[#FAF8F5]/80 text-[11px] font-semibold text-[#8C8275] uppercase tracking-wider">
+                <tr className="border-b border-[#E8E3DA] bg-[#FAF8F5] font-semibold text-[#5C554B]">
+                  <th className="py-3 px-4 w-12 text-center">#</th>
                   <th className="py-3 px-4">Campaign & Subject</th>
-                  <th className="py-3 px-4">Template</th>
                   <th className="py-3 px-4">Schedule Date</th>
-                  <th className="py-3 px-4">Holidays</th>
+                  <th className="py-3 px-4">Holiday Rule</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E8E3DA] text-xs">
-                {campaigns.map((camp) => {
+              <tbody className="divide-y divide-[#F0ECE3]">
+                {campaigns.map((camp, index) => {
                   const name = camp.email_campaign_name || camp.name || 'Unnamed Campaign';
                   const subject = camp.email_campaign_subject || camp.subject || '—';
                   const date = camp.email_campaign_date || camp.date || '—';
                   const holiday = camp.email_campaign_holiday || camp.holiday || 'Yes';
-                  const status = camp.email_campaign_status || camp.status || 'Pending';
-                  const templateName = camp.template?.template_name || camp.template_name || (camp.email_campaign_template_id ? `Tmpl #${camp.email_campaign_template_id}` : '—');
+                  const currentStatus = camp.email_campaign_status || camp.status || 'Pending';
+                  const rowNumber = (currentPage - 1) * 10 + index + 1;
                   const isStatusLoading = statusUpdatingId === camp.id;
 
                   return (
-                    <tr key={camp.id} className="hover:bg-[#FAF8F5]/50 transition">
-                      {/* Name & Subject */}
-                      <td className="py-3.5 px-4 max-w-xs">
-                        <div className="font-semibold text-[#1A1817] truncate">{name}</div>
-                        <div className="text-[11px] text-[#8C8275] truncate mt-0.5" title={subject}>
-                          {subject}
+                    <tr key={camp.id || index} className="hover:bg-[#FAF8F5] transition">
+                      {/* Row Index */}
+                      <td className="py-3.5 px-4 font-mono text-[#9C9488] text-center">
+                        {rowNumber}
+                      </td>
+
+                      {/* Campaign Info */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FAF8F5] border border-[#E8E3DA] text-[#9E7432] shrink-0">
+                            <Mail className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 max-w-xs sm:max-w-md">
+                            <p className="font-semibold text-xs text-[#1A1817] truncate">{name}</p>
+                            <p className="text-[11px] text-[#8C8275] truncate mt-0.5">
+                              {subject}
+                            </p>
+                          </div>
                         </div>
                       </td>
 
-                      {/* Template */}
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#E8E3DA] bg-[#FAF8F5] px-2.5 py-1 text-[11px] font-medium text-[#1A1817]">
-                          <FileText className="h-3 w-3 text-[#C99C4B]" />
-                          <span className="truncate max-w-[140px]">{templateName}</span>
-                        </span>
+                      {/* Schedule Date */}
+                      <td className="py-3.5 px-4 whitespace-nowrap text-[#5C554B]">
+                        <div className="inline-flex items-center gap-1.5 font-mono text-[11px]">
+                          <Calendar className="h-3.5 w-3.5 text-[#9C9488]" />
+                          <span>{date}</span>
+                        </div>
                       </td>
 
-                      {/* Scheduled Date */}
+                      {/* Holiday Rule */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1.5 text-xs text-[#1A1817]">
-                          <Calendar className="h-3.5 w-3.5 text-[#8C8275]" />
-                          {date}
-                        </span>
-                      </td>
-
-                      {/* Holiday logic */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                          holiday === 'Yes' ? 'bg-[#FAF8F5] border border-[#E8E3DA] text-[#5C554B]' : 'bg-[#EBF3EC] text-[#2D5A34]'
-                        }`}>
-                          {holiday === 'Yes' ? 'Skip Holiday' : 'Ignore Holiday'}
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium ${
+                            holiday === 'Yes'
+                              ? 'bg-[#FAF8F5] text-[#5C554B] border border-[#E8E3DA]'
+                              : 'bg-[#FFF9E6] text-[#9E7432] border border-[#FCE8AE]'
+                          }`}
+                        >
+                          <ShieldAlert className="h-3 w-3" />
+                          {holiday === 'Yes' ? 'Skip on Holiday' : 'Ignore Holiday'}
                         </span>
                       </td>
 
@@ -388,13 +343,13 @@ export default function EmailCampaignPage() {
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <div className="relative inline-block">
                           <select
-                            value={status}
+                            value={currentStatus}
                             disabled={isStatusLoading}
                             onChange={(e) => handleStatusChange(camp.id, e.target.value)}
-                            className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold outline-none transition cursor-pointer disabled:opacity-50 ${
-                              String(status).toLowerCase() === 'sent'
-                                ? 'border-[#D0E2D4] bg-[#EBF3EC] text-[#2D5A34]'
-                                : String(status).toLowerCase() === 'hold'
+                            className={`appearance-none rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer outline-none ${
+                              String(currentStatus).toLowerCase() === 'sent'
+                                ? 'border-[#C3E6CB] bg-[#EBF7EE] text-[#1E7E34]'
+                                : String(currentStatus).toLowerCase() === 'hold'
                                 ? 'border-[#F1D5C4] bg-[#FBF0EA] text-[#8F4E24]'
                                 : 'border-[#E8E3DA] bg-[#FAF8F5] text-[#8C6D23]'
                             }`}
@@ -411,7 +366,7 @@ export default function EmailCampaignPage() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
-                            onClick={() => handleOpenView(camp)}
+                            onClick={() => navigate(`/email-campaign/view/${camp.id}`)}
                             title="View Overview"
                             className="p-1.5 text-[#8C8275] hover:text-[#1A1817] hover:bg-[#FAF8F5] rounded-lg transition cursor-pointer"
                           >
@@ -448,34 +403,6 @@ export default function EmailCampaignPage() {
           }}
         />
       </div>
-
-      {/* Campaign Create/Edit Modal */}
-      <EmailCampaignModal
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditingCampaign(null);
-        }}
-        onSubmit={handleSaveCampaign}
-        initialData={editingCampaign}
-        isEditing={!!editingCampaign}
-      />
-
-      {/* Campaign View Details Modal */}
-      <EmailCampaignViewModal
-        isOpen={viewModalOpen}
-        onClose={() => {
-          setViewModalOpen(false);
-          setViewCampaign(null);
-        }}
-        campaign={viewCampaign}
-        onSubDeleted={() => {
-          fetchCampaigns(currentPage);
-          if (viewCampaign) {
-            handleOpenView(viewCampaign);
-          }
-        }}
-      />
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (

@@ -6,9 +6,23 @@ const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   const [appStatus, setAppStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
-  const [companyInfo, setCompanyInfo] = useState(null);
+  const [companyInfo, setCompanyInfo] = useState(() => {
+    try {
+      const saved = localStorage.getItem('emwa_crm_company');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [appVersion, setAppVersion] = useState(null);
-  const [imageUrlConfig, setImageUrlConfig] = useState([]);
+  const [imageUrlConfig, setImageUrlConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem('emwa_crm_image_url');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [dotenvConfig, setDotenvConfig] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem('emwa_sidebar_collapsed') === 'true';
@@ -22,7 +36,28 @@ export function AppProvider({ children }) {
     });
   };
 
+  const syncCompanyData = (company, version, imageUrls) => {
+    if (company) {
+      setCompanyInfo(company);
+      localStorage.setItem('emwa_crm_company', JSON.stringify(company));
+    }
+    if (version) {
+      setAppVersion(version);
+    }
+    if (Array.isArray(imageUrls) && imageUrls.length > 0) {
+      setImageUrlConfig(imageUrls);
+      localStorage.setItem('emwa_crm_image_url', JSON.stringify(imageUrls));
+    }
+  };
+
   useEffect(() => {
+    const handleCompanyUpdate = (e) => {
+      if (e?.detail) {
+        syncCompanyData(e.detail.company, e.detail.version, e.detail.imageUrls);
+      }
+    };
+    window.addEventListener('emwa_company_updated', handleCompanyUpdate);
+
     (async () => {
       try {
         const data = await checkPanelStatus();
@@ -30,9 +65,7 @@ export function AppProvider({ children }) {
         const version = data?.version?.version_panel || null;
         const imageUrls = data?.image_url || [];
 
-        setCompanyInfo(company);
-        setAppVersion(version);
-        setImageUrlConfig(imageUrls);
+        syncCompanyData(company, version, imageUrls);
         setAppStatus('ok');
 
         console.info(
@@ -43,28 +76,48 @@ export function AppProvider({ children }) {
         setAppStatus('error');
       }
     })();
+
+    return () => {
+      window.removeEventListener('emwa_company_updated', handleCompanyUpdate);
+    };
   }, []);
 
-  /** Helper to construct full company logo URL */
+  /** Helper to construct full company logo URL with dynamic API data and fallback */
   const companyLogoUrl = useMemo(() => {
-    if (!companyInfo?.company_logo) return null;
-    const companyImgObj = (imageUrlConfig || []).find((i) => i.image_for === 'Company');
+    if (!companyInfo?.company_logo) return '/no_image.jpg';
+    const companyImgObj = (imageUrlConfig || []).find(
+      (i) => i.image_for?.toLowerCase() === 'company'
+    );
     const baseUrl = companyImgObj?.image_url || 'https://easemarketing.in/emwaapi/public/assets/images/company_images/';
-    if (companyInfo.company_logo.startsWith('http')) return companyInfo.company_logo;
-    return `${baseUrl.replace(/\/$/, '')}/${companyInfo.company_logo}`;
+    if (
+      companyInfo.company_logo.startsWith('http://') ||
+      companyInfo.company_logo.startsWith('https://') ||
+      companyInfo.company_logo.startsWith('blob:') ||
+      companyInfo.company_logo.startsWith('data:')
+    ) {
+      return companyInfo.company_logo;
+    }
+    const cleanBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    const cleanLogo = companyInfo.company_logo.startsWith('/')
+      ? companyInfo.company_logo.slice(1)
+      : companyInfo.company_logo;
+    return `${cleanBase}${cleanLogo}`;
   }, [companyInfo, imageUrlConfig]);
 
   /** Helper for No Image default fallback URL */
   const noImageUrl = useMemo(() => {
-    const noImgObj = (imageUrlConfig || []).find((i) => i.image_for === 'No Image');
-    return noImgObj?.image_url || 'https://easemarketing.in/emwaapi/public/assets/images/no_image.jpg';
+    const noImgObj = (imageUrlConfig || []).find((i) => i.image_for?.toLowerCase() === 'no image');
+    return noImgObj?.image_url || '/no_image.jpg';
   }, [imageUrlConfig]);
 
   const value = useMemo(
     () => ({
       appStatus,
       companyInfo,
-      setCompanyInfo,
+      setCompanyInfo: (info) => {
+        setCompanyInfo(info);
+        if (info) localStorage.setItem('emwa_crm_company', JSON.stringify(info));
+      },
       companyDetails: companyInfo,
       appVersion,
       version: { version_panel: appVersion },

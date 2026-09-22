@@ -1,19 +1,17 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
-import TemplateModal from '../components/template/TemplateModal';
 import TemplatePreviewModal from '../components/template/TemplatePreviewModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import {
   getTemplates,
   getTemplateById,
-  createTemplate,
-  updateTemplate,
   updateTemplateStatus,
 } from '../services/templateApi';
+import { useAuthContext } from '../context/AuthContext';
 import {
   Plus,
   Search,
@@ -41,20 +39,16 @@ function extractList(response) {
   return [];
 }
 
-const initialForm = {
-  template_name: '',
-  template_type: 'Email',
-  template_id: '',
-  template_url: '',
-  template_design: '',
-  template_status: 'Active',
-};
-
 export default function TemplatePage() {
+  const navigate = useNavigate();
+  const { hasEmail, hasWhatsApp } = useAuthContext();
+
+  const defaultType = hasEmail && !hasWhatsApp ? 'Email' : !hasEmail && hasWhatsApp ? 'WhatsApp' : 'All';
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('All'); // 'All' | 'Email' | 'WhatsApp'
+  const [typeFilter, setTypeFilter] = useState(defaultType); // 'All' | 'Email' | 'WhatsApp'
   const [statusFilter, setStatusFilter] = useState('All'); // 'All' | 'Active' | 'Inactive'
 
   const debouncedSearch = useDebounce(searchQuery, 350);
@@ -66,12 +60,6 @@ export default function TemplatePage() {
   const [perPage, setPerPage] = useState(10);
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
-
-  // Modal State (Create / Edit)
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState(initialForm);
 
   // Preview Modal State
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -163,82 +151,7 @@ export default function TemplatePage() {
     }
   };
 
-  /* ── 2. CREATE (POST /template) & UPDATE (PUT /template/{id}) ── */
-  const handleOpenCreateModal = () => {
-    setEditingId(null);
-    setForm(initialForm);
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEditModal = async (item) => {
-    setEditingId(item.id);
-    setIsModalOpen(true);
-
-    const type = item.template_type || 'Email';
-    const name = item.template_name || item.name || '';
-    const templateId = type === 'Email' ? name : (item.template_id || item.id || name);
-
-    setForm({
-      template_name: name,
-      template_type: type,
-      template_id: templateId,
-      template_url: item.template_url || '',
-      template_design: item.template_design || item.design || '',
-      template_status: item.template_status || item.status || 'Active',
-    });
-
-    try {
-      const res = await getTemplateById(item.id);
-      const freshData = res?.data || res?.template || res;
-      if (freshData) {
-        const fType = freshData.template_type || type;
-        const fName = freshData.template_name || name;
-        const fTemplateId = fType === 'Email' ? fName : (freshData.template_id || fName);
-
-        setForm({
-          template_name: fName,
-          template_type: fType,
-          template_id: fTemplateId,
-          template_url: freshData.template_url || '',
-          template_design: freshData.template_design || freshData.design || '',
-          template_status: freshData.template_status || freshData.status || 'Active',
-        });
-      }
-    } catch (err) {
-      // Use existing values
-    }
-  };
-
-  const handleFormSubmit = async (e) => {
-    e?.preventDefault();
-    setSubmitting(true);
-
-    try {
-      if (editingId) {
-        // PUT /template/{id}
-        await updateTemplate(editingId, form);
-        toast.success('Template updated successfully.');
-        setItems((prev) =>
-          prev.map((it) => (it.id === editingId ? { ...it, ...form } : it))
-        );
-      } else {
-        // POST /template
-        await createTemplate(form);
-        toast.success('Template created successfully.');
-      }
-
-      setIsModalOpen(false);
-      setForm(initialForm);
-      fetchTemplateList(currentPage, searchQuery, typeFilter, statusFilter);
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to save template.';
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  /* ── 3. PATCH /templates/{id}/status ── */
+  /* ── 2. PATCH /templates/{id}/status ── */
   const handleToggleStatus = async (item) => {
     const id = item.id;
     const currentStatus = item.template_status || item.status || 'Active';
@@ -262,7 +175,7 @@ export default function TemplatePage() {
     }
   };
 
-  /* ── 4. Preview Modal ── */
+  /* ── 3. Preview Modal ── */
   const handleOpenPreview = async (item) => {
     setPreviewItem(item);
     setPreviewModalOpen(true);
@@ -289,40 +202,48 @@ export default function TemplatePage() {
       else if (type === 'whatsapp') whatsappCount++;
     });
 
-    return [
+    const stats = [
       {
         label: 'Total Templates',
         value: total,
         icon: LayoutTemplate,
         color: 'amber',
         filterValue: 'All',
-        subtext: 'Configured message templates',
+        subtext: 'Saved broadcast designs',
       },
-      {
+    ];
+
+    if (hasEmail) {
+      stats.push({
         label: 'Email Templates',
         value: emailCount,
         icon: Mail,
-        color: 'blue',
+        color: 'emerald',
         filterValue: 'Email',
         subtext: 'Rich HTML newsletter layouts',
-      },
-      {
+      });
+    }
+
+    if (hasWhatsApp) {
+      stats.push({
         label: 'WhatsApp Templates',
         value: whatsappCount,
         icon: MessageSquare,
-        color: 'emerald',
+        color: 'blue',
         filterValue: 'WhatsApp',
-        subtext: 'Direct instant message drafts',
-      },
-    ];
-  }, [items, totalCount]);
+        subtext: 'Meta broadcast message templates',
+      });
+    }
+
+    return stats;
+  }, [items, totalCount, hasEmail, hasWhatsApp]);
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F0] text-[#1A1817]">
       <Sidebar />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <Header title="Template Library" />
+        <Header title="Template Management" />
 
         <main className="flex-1 p-5 md:p-6 max-w-7xl w-full">
           
@@ -330,10 +251,14 @@ export default function TemplatePage() {
           <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h1 className="text-sm md:text-base font-semibold text-[#1A1817] tracking-tight">
-                Campaign Templates
+                Message Templates
               </h1>
               <p className="text-xs text-[#78716C] mt-0.5">
-                Manage reusable Email HTML designs and WhatsApp messaging templates
+                {hasEmail && hasWhatsApp
+                  ? 'Manage, design, and preview Email and WhatsApp campaign templates'
+                  : hasEmail
+                  ? 'Manage, design, and preview Email marketing templates'
+                  : 'Manage and configure WhatsApp broadcast message templates'}
               </p>
             </div>
 
@@ -348,11 +273,11 @@ export default function TemplatePage() {
               </button>
 
               <button
-                onClick={handleOpenCreateModal}
+                onClick={() => navigate('/template/create')}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
-                <span>Add Template</span>
+                <span>New Template</span>
               </button>
             </div>
           </div>
@@ -370,47 +295,47 @@ export default function TemplatePage() {
           {/* Search & Filter Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
+            {/* Search Input */}
             <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full sm:w-72">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9C9488] pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search templates by name..."
+                placeholder="Search templates by name or ID..."
                 className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
 
-            <div className="flex items-center gap-2.5 self-end sm:self-auto">
-              {/* Type Filter */}
-              <StatusFilterToggle
-                label="Type:"
-                options={['All', 'Email', 'WhatsApp']}
-                value={typeFilter}
-                onChange={(val) => {
-                  setTypeFilter(val);
-                  setCurrentPage(1);
-                }}
-              />
-
-              {/* Status Filter */}
-              <StatusFilterToggle
-                options={['All', 'Active', 'Inactive']}
-                value={statusFilter}
-                onChange={(val) => {
-                  setStatusFilter(val);
-                  setCurrentPage(1);
-                }}
-              />
-            </div>
-
+            {/* Type Selector (If both features active) */}
+            {hasEmail && hasWhatsApp && (
+              <div className="flex items-center gap-1 bg-[#FAF8F5] p-0.5 rounded-lg border border-[#E2DDD5] self-start sm:self-auto">
+                {['All', 'Email', 'WhatsApp'].map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => {
+                      setTypeFilter(t);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-all cursor-pointer ${
+                      typeFilter === t
+                        ? 'bg-white text-[#1A1817] shadow-2xs font-semibold'
+                        : 'text-[#78716C] hover:text-[#1A1817]'
+                    }`}
+                  >
+                    {t === 'All' ? 'All Channels' : t}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Templates Table View */}
+          {/* Templates Table Card */}
           {loading ? (
             <div className="bg-white rounded-2xl border border-[#E8E3DA] p-12 text-center shadow-2xs">
               <RefreshCw className="h-7 w-7 animate-spin text-[#9E7432] mx-auto mb-3" />
-              <p className="text-xs font-medium text-[#78716C]">Loading templates...</p>
+              <p className="text-xs font-medium text-[#78716C]">Loading message templates...</p>
             </div>
           ) : items.length === 0 ? (
             <div className="bg-white rounded-2xl border border-[#E8E3DA] p-14 text-center shadow-2xs">
@@ -419,12 +344,12 @@ export default function TemplatePage() {
               </div>
               <h3 className="font-display text-base font-bold text-[#1A1817]">No templates found</h3>
               <p className="text-xs text-[#8C8275] max-w-sm mx-auto mt-1 mb-5">
-                {searchQuery || typeFilter !== 'All' || statusFilter !== 'All'
-                  ? 'No templates match your search or filter options.'
-                  : 'Start building your template library for marketing newsletters and WhatsApp notifications.'}
+                {searchQuery || typeFilter !== defaultType
+                  ? 'No templates match your search keyword or selected filter.'
+                  : 'Start building reusable message templates for your Email and WhatsApp broadcasts.'}
               </p>
               <button
-                onClick={handleOpenCreateModal}
+                onClick={() => navigate('/template/create')}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1A1817] text-[#FAF8F5] text-xs font-semibold shadow-xs hover:bg-[#2C2825] transition cursor-pointer"
               >
                 <Plus className="h-4 w-4 text-[#C99C4B]" />
@@ -437,11 +362,11 @@ export default function TemplatePage() {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-[#E8E3DA] bg-[#FAF8F5] font-semibold text-[#5C554B]">
-                      <th className="px-5 py-3 w-14">#</th>
+                      <th className="px-5 py-3 w-16">#</th>
                       <th className="px-5 py-3">Template Name</th>
                       <th className="px-5 py-3">Type</th>
                       <th className="px-5 py-3">Template ID</th>
-                      <th className="px-5 py-3">URL / Link</th>
+                      <th className="px-5 py-3">Preview / Link</th>
                       <th className="px-5 py-3">Status</th>
                       <th className="px-5 py-3 text-right">Actions</th>
                     </tr>
@@ -450,61 +375,64 @@ export default function TemplatePage() {
                     {items.map((item, index) => {
                       const id = item.id;
                       const name = item.template_name || item.name || 'Untitled Template';
-                      const type = item.template_type || 'Email';
-                      const isEmail = type === 'Email';
-                      const templateId = item.template_id || item.id;
+                      const type = item.template_type || item.type || 'Email';
+                      const templateId = item.template_id || (type === 'Email' ? name : id);
+                      const status = item.template_status || item.status || 'Active';
+                      const isActive = status === 'Active';
                       const url =
                         item.template_url ||
                         item.url ||
                         item.template_link ||
                         item.link ||
-                        item.template_preview_url ||
-                        item.preview_url ||
-                        item.webview_url;
-                      const status = item.template_status || item.status || 'Active';
-                      const isActive = status === 'Active';
+                        item.preview_url;
                       const rowNumber = (currentPage - 1) * perPage + index + 1;
 
                       return (
                         <tr key={id || index} className="hover:bg-[#FAF8F5] transition-colors">
                           <td className="px-5 py-3.5 font-mono text-xs text-[#9C9488]">{rowNumber}</td>
-                          
+
                           {/* Name */}
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-2.5">
                               <div
-                                className={`flex h-7 w-7 items-center justify-center rounded-lg border font-mono text-xs font-bold flex-shrink-0 ${
-                                  isEmail
+                                className={`flex h-8 w-8 items-center justify-center rounded-lg border font-mono text-xs font-bold flex-shrink-0 ${
+                                  type.toLowerCase() === 'email'
                                     ? 'bg-[#FBF4E8] text-[#9E7432] border-[#F2E4C9]'
-                                    : 'bg-[#EBF7EE] text-[#1E7E34] border-[#C3E6CB]'
+                                    : 'bg-[#E6F8EE] text-[#1E7E34] border-[#C3E6CB]'
                                 }`}
                               >
-                                {isEmail ? <Mail className="h-3.5 w-3.5" /> : <MessageSquare className="h-3.5 w-3.5" />}
+                                {type.toLowerCase() === 'email' ? (
+                                  <Mail className="h-4 w-4" />
+                                ) : (
+                                  <MessageSquare className="h-4 w-4" />
+                                )}
                               </div>
-                              <span className="font-semibold text-xs text-[#1A1817]">{name}</span>
+                              <span className="font-semibold text-xs text-[#1A1817] block">
+                                {name}
+                              </span>
                             </div>
                           </td>
 
                           {/* Type */}
                           <td className="px-5 py-3.5">
                             <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                                isEmail
-                                  ? 'bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9]'
-                                  : 'bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB]'
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                                type.toLowerCase() === 'email'
+                                  ? 'bg-[#FAF6EE] text-[#8C6527] border-[#E8DFC8]'
+                                  : 'bg-[#EBF7EE] text-[#1E7E34] border-[#C3E6CB]'
                               }`}
                             >
-                              {type}
+                              {type.toLowerCase() === 'email' ? 'Email' : 'WhatsApp'}
                             </span>
                           </td>
 
                           {/* Template ID */}
-                          <td className="px-5 py-3.5 font-mono text-xs text-[#78716C] max-w-[150px] truncate">
-                            {templateId}
+                          <td className="px-5 py-3.5 font-mono text-xs text-[#5C554B]">
+                            {templateId || '—'}
                           </td>
 
-                          {/* URL */}
-                          <td className="px-5 py-3.5 max-w-[180px] truncate">
+                          {/* Preview Link */}
+                          <td className="px-5 py-3.5 max-w-[200px] truncate">
                             {url ? (
                               <a
                                 href={url}
@@ -553,7 +481,7 @@ export default function TemplatePage() {
 
                               <button
                                 type="button"
-                                onClick={() => handleOpenEditModal(item)}
+                                onClick={() => navigate(`/template/edit/${id}`)}
                                 title="Edit Template"
                                 className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
                               >
@@ -584,23 +512,15 @@ export default function TemplatePage() {
         </main>
       </div>
 
-      {/* Add / Edit Template Modal */}
-      <TemplateModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleFormSubmit}
-        form={form}
-        setForm={setForm}
-        editingId={editingId}
-        submitting={submitting}
-      />
-
       {/* Live Preview Modal */}
       <TemplatePreviewModal
         isOpen={previewModalOpen}
         onClose={() => setPreviewModalOpen(false)}
         item={previewItem}
-        onEdit={(it) => handleOpenEditModal(it)}
+        onEdit={(it) => {
+          setPreviewModalOpen(false);
+          navigate(`/template/edit/${it.id}`);
+        }}
       />
     </div>
   );

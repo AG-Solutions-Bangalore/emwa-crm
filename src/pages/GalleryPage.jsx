@@ -4,7 +4,6 @@ import Header from '../components/layout/Header';
 import GalleryModal from '../components/gallery/GalleryModal';
 import GalleryImageViewModal from '../components/gallery/GalleryImageViewModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import { useAppContext } from '../context/AppContext';
@@ -66,7 +65,7 @@ export default function GalleryPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid'
 
   const debouncedSearch = useDebounce(searchQuery, 350);
 
@@ -424,15 +423,6 @@ export default function GalleryPage() {
             </form>
 
             <div className="flex items-center gap-2.5 self-end sm:self-auto">
-              <StatusFilterToggle
-                options={['All', 'Active', 'Inactive']}
-                value={statusFilter}
-                onChange={(val) => {
-                  setStatusFilter(val);
-                  setCurrentPage(1);
-                }}
-              />
-
               {/* View Mode Toggle (Grid / Table) */}
               <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5 shadow-2xs">
                 <button
@@ -653,16 +643,9 @@ export default function GalleryPage() {
 
                           {/* Photo Details */}
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-xs text-[#1A1817] whitespace-nowrap">
-                                Photo #{item.id}
-                              </span>
-                              {item.gallery_image && (
-                                <span className="text-[11px] text-[#8C8275] bg-[#F4EFE6] px-2 py-0.5 rounded font-mono truncate max-w-[200px]">
-                                  {item.gallery_image}
-                                </span>
-                              )}
-                            </div>
+                            <span className="font-mono text-xs font-semibold text-[#1A1817]">
+                              {item.gallery_image || `Photo #${item.id}`}
+                            </span>
                           </td>
 
                           {/* Status Pill Toggle */}

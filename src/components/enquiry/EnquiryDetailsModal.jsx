@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, MessageSquare, Clock } from 'lucide-react';
+import { useAuthContext } from '../../context/AuthContext';
 
 function formatDate(dateStr) {
   if (!dateStr) return 'N/A';
@@ -27,6 +28,7 @@ function getStatusBadge(status) {
 }
 
 export default function EnquiryDetailsModal({ isOpen, onClose, enquiry, loading }) {
+  const { hasEmail, hasWhatsApp } = useAuthContext();
   if (!isOpen) return null;
 
   const status = enquiry?.enquiryStatus || enquiry?.enquiry_status || enquiry?.status || 'Pending';
@@ -88,23 +90,39 @@ export default function EnquiryDetailsModal({ isOpen, onClose, enquiry, loading 
                   <span className="font-semibold text-[#1A1817] text-sm">{name}</span>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Mobile</span>
-                  <span className="font-semibold text-[#1A1817] text-sm">{mobile}</span>
-                </div>
+                {hasWhatsApp ? (
+                  <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                    <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Mobile</span>
+                    <span className="font-semibold text-[#1A1817] text-sm">{mobile}</span>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                    <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Occasion / Event</span>
+                    <span className="font-semibold text-[#1A1817] text-sm">{occasion}</span>
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3.5">
+              {hasWhatsApp ? (
+                <div className="grid grid-cols-2 gap-3.5">
+                  {hasEmail && (
+                    <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                      <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Email</span>
+                      <span className="font-semibold text-[#1A1817] text-sm break-all">{email}</span>
+                    </div>
+                  )}
+
+                  <div className={`p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA] ${!hasEmail ? 'col-span-2' : ''}`}>
+                    <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Occasion / Event</span>
+                    <span className="font-semibold text-[#1A1817] text-sm">{occasion}</span>
+                  </div>
+                </div>
+              ) : hasEmail ? (
                 <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
                   <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Email</span>
                   <span className="font-semibold text-[#1A1817] text-sm break-all">{email}</span>
                 </div>
-
-                <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Occasion / Event</span>
-                  <span className="font-semibold text-[#1A1817] text-sm">{occasion}</span>
-                </div>
-              </div>
+              ) : null}
 
               {weddingDate && (
                 <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
