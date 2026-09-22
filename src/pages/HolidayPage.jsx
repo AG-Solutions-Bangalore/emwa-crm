@@ -4,7 +4,6 @@ import Header from '../components/layout/Header';
 import HolidayModal from '../components/holiday/HolidayModal';
 import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import {
@@ -53,6 +52,22 @@ function formatHolidayDate(dateStr) {
     month: 'short',
     year: 'numeric',
   });
+}
+
+function formatDDMMYYYY(dateStr) {
+  if (!dateStr) return '—';
+  const cleanStr = String(dateStr).split('T')[0].trim();
+  const parts = cleanStr.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    const [year, month, day] = parts;
+    return `${day}-${month}-${year}`;
+  }
+  const d = parseHolidayDate(dateStr);
+  if (!d) return String(dateStr);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
 }
 
 function getDayOfWeek(dateStr) {
@@ -362,14 +377,6 @@ export default function HolidayPage() {
                 className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
-
-            <StatusFilterToggle
-              label="Period:"
-              options={['All', 'Upcoming', 'Past']}
-              value={filterPeriod}
-              onChange={(period) => setFilterPeriod(period)}
-            />
-
           </div>
 
           {/* Holidays Table View */}
@@ -434,7 +441,7 @@ export default function HolidayPage() {
                                   {formatHolidayDate(date)}
                                 </span>
                                 <span className="font-mono text-[10px] text-[#8C8275]">
-                                  {date}
+                                  {formatDDMMYYYY(date)}
                                 </span>
                               </div>
                             </div>

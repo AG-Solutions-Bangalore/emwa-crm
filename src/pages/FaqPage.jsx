@@ -4,7 +4,6 @@ import Header from '../components/layout/Header';
 import FaqModal from '../components/faq/FaqModal';
 import FaqViewModal from '../components/faq/FaqViewModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import {
@@ -420,16 +419,6 @@ export default function FaqPage() {
                 className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
-
-            <StatusFilterToggle
-              options={['All', 'Active', 'Inactive']}
-              value={statusFilter}
-              onChange={(val) => {
-                setStatusFilter(val);
-                setCurrentPage(1);
-              }}
-            />
-
           </div>
 
           {/* Main List */}

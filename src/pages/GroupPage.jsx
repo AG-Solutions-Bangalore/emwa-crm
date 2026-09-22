@@ -4,7 +4,6 @@ import Header from '../components/layout/Header';
 import GroupModal from '../components/group/GroupModal';
 import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import {
@@ -313,20 +312,10 @@ export default function GroupPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search groups by name or ID..."
+                placeholder="Search groups by name..."
                 className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
-
-            <StatusFilterToggle
-              options={['All', 'Active', 'Inactive']}
-              value={statusFilter}
-              onChange={(val) => {
-                setStatusFilter(val);
-                setCurrentPage(1);
-              }}
-            />
-
           </div>
 
           {/* Table List View */}
@@ -362,7 +351,6 @@ export default function GroupPage() {
                     <tr className="border-b border-[#E8E3DA] bg-[#FAF8F5] font-semibold text-[#5C554B]">
                       <th className="px-5 py-3 w-16">#</th>
                       <th className="px-5 py-3">Group Name</th>
-                      <th className="px-5 py-3">Item ID</th>
                       <th className="px-5 py-3">Status</th>
                       <th className="px-5 py-3 text-right">Actions</th>
                     </tr>
@@ -387,11 +375,6 @@ export default function GroupPage() {
                               </div>
                               <span className="font-semibold text-xs text-[#1A1817]">{name}</span>
                             </div>
-                          </td>
-
-                          {/* ID */}
-                          <td className="px-5 py-3.5 font-mono text-xs text-[#78716C]">
-                            #{id}
                           </td>
 
                           {/* Status Pill Toggle */}

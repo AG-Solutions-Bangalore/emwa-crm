@@ -4,7 +4,6 @@ import Header from '../components/layout/Header';
 import ClientModal from '../components/client/ClientModal';
 import ClientViewModal from '../components/client/ClientViewModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import { useAppContext } from '../context/AppContext';
@@ -368,15 +367,6 @@ export default function ClientPage() {
             </form>
 
             <div className="flex items-center gap-2.5 self-end sm:self-auto">
-              <StatusFilterToggle
-                options={['All', 'Active', 'Inactive']}
-                value={statusFilter}
-                onChange={(val) => {
-                  setStatusFilter(val);
-                  setCurrentPage(1);
-                }}
-              />
-
               {/* View Mode Toggle */}
               <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5 shadow-2xs">
                 <button

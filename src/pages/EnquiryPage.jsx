@@ -4,15 +4,10 @@ import Header from '../components/layout/Header';
 import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import EnquiryDetailsModal from '../components/enquiry/EnquiryDetailsModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
-import { 
-  getEnquiries, 
-  getEnquiryById, 
-  updateEnquiryStatus, 
-  deleteEnquiry 
-} from '../services/enquiryApi';
+import { getEnquiries, getEnquiryById, updateEnquiryStatus, deleteEnquiry } from '../services/enquiryApi';
+import { useAuthContext } from '../context/AuthContext';
 import { 
   Search, 
   Trash2, 
@@ -49,6 +44,7 @@ function formatDate(dateStr) {
 const STATUS_OPTIONS = ['Pending', 'Processing', 'Completed', 'Cancel'];
 
 export default function EnquiryPage() {
+  const { hasEmail, hasWhatsApp } = useAuthContext();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -294,17 +290,6 @@ export default function EnquiryPage() {
                 className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
-
-            {/* Status Filter Toggle */}
-            <StatusFilterToggle
-              options={['All', 'Pending', 'Processing', 'Completed', 'Cancel']}
-              value={statusFilter}
-              onChange={(newStatus) => {
-                setStatusFilter(newStatus);
-                setCurrentPage(1);
-              }}
-            />
-
           </div>
 
           {/* Enquiries Table Card */}
@@ -332,7 +317,7 @@ export default function EnquiryPage() {
                       <tr>
                         <th className="px-4 py-2.5 w-14">#</th>
                         <th className="px-4 py-2.5">Customer</th>
-                        <th className="px-4 py-2.5">Contact</th>
+                        {hasWhatsApp && <th className="px-4 py-2.5">Contact</th>}
                         <th className="px-4 py-2.5">Occasion</th>
                         <th className="px-4 py-2.5">Date</th>
                         <th className="px-4 py-2.5">Status</th>
@@ -356,12 +341,14 @@ export default function EnquiryPage() {
                             
                             <td className="px-4 py-3">
                               <div className="font-medium text-[#1A1817] tracking-tight">{name}</div>
-                              {email && <div className="text-[11px] text-[#8C8275] mt-0.5">{email}</div>}
+                              {hasEmail && email && <div className="text-[11px] text-[#8C8275] mt-0.5">{email}</div>}
                             </td>
 
-                            <td className="px-4 py-3 font-medium text-[#3D372E]">
-                              {mobile}
-                            </td>
+                            {hasWhatsApp && (
+                              <td className="px-4 py-3 font-medium text-[#3D372E]">
+                                {mobile}
+                              </td>
+                            )}
 
                             <td className="px-4 py-3">
                               <span className="px-2.5 py-0.5 rounded-full bg-[#FAF8F5] border border-[#E8E3DA] text-[#4A443D] font-medium text-[11px]">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Mail, MessageSquare, LayoutTemplate, Link, Save, AlertCircle } from 'lucide-react';
 import TemplateCKEditor from './TemplateCKEditor';
+import { useAuthContext } from '../../context/AuthContext';
 
 export default function TemplateModal({
   isOpen,
@@ -11,13 +12,30 @@ export default function TemplateModal({
   editingId,
   submitting,
 }) {
+  const { hasEmail, hasWhatsApp } = useAuthContext();
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setErrorMsg('');
+      if (!editingId) {
+        if (!hasEmail && hasWhatsApp && form.template_type !== 'WhatsApp') {
+          setForm((prev) => ({
+            ...prev,
+            template_type: 'WhatsApp',
+            template_url: null,
+            template_design: null,
+          }));
+        } else if (hasEmail && !hasWhatsApp && form.template_type !== 'Email') {
+          setForm((prev) => ({
+            ...prev,
+            template_type: 'Email',
+            template_id: prev.template_name || '',
+          }));
+        }
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, hasEmail, hasWhatsApp, editingId]);
 
   if (!isOpen) return null;
 
@@ -96,7 +114,13 @@ export default function TemplateModal({
                 {editingId ? 'Edit Message Template' : 'Create Message Template'}
               </h3>
               <p className="text-xs text-[#78716C]">
-                {editingId ? 'Update template design and configuration' : 'Create reusable Email & WhatsApp campaign templates'}
+                {editingId
+                  ? 'Update template design and configuration'
+                  : hasEmail && hasWhatsApp
+                  ? 'Create reusable Email & WhatsApp campaign templates'
+                  : hasEmail
+                  ? 'Create reusable Email campaign templates'
+                  : 'Create reusable WhatsApp campaign templates'}
               </p>
             </div>
           </div>
@@ -123,38 +147,40 @@ export default function TemplateModal({
             )}
 
             {/* Template Type Selector */}
-            <div>
-              <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                Template Type <span className="text-[#9A2D2D]">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleTypeChange('Email')}
-                  className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-xs font-semibold transition cursor-pointer ${
-                    isEmail
-                      ? 'bg-[#1A1817] text-[#FAF8F5] border-[#1A1817] shadow-xs'
-                      : 'bg-[#FAF8F5] text-[#5C554B] border-[#E2DDD5] hover:bg-[#F5EFE3]'
-                  }`}
-                >
-                  <Mail className={`h-4 w-4 ${isEmail ? 'text-[#C99C4B]' : 'text-[#8C8275]'}`} />
-                  <span>Email Template</span>
-                </button>
+            {hasEmail && hasWhatsApp ? (
+              <div>
+                <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
+                  Template Type <span className="text-[#9A2D2D]">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleTypeChange('Email')}
+                    className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+                      isEmail
+                        ? 'bg-[#1A1817] text-[#FAF8F5] border-[#1A1817] shadow-xs'
+                        : 'bg-[#FAF8F5] text-[#5C554B] border-[#E2DDD5] hover:bg-[#F5EFE3]'
+                    }`}
+                  >
+                    <Mail className={`h-4 w-4 ${isEmail ? 'text-[#C99C4B]' : 'text-[#8C8275]'}`} />
+                    <span>Email Template</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => handleTypeChange('WhatsApp')}
-                  className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-xs font-semibold transition cursor-pointer ${
-                    !isEmail
-                      ? 'bg-[#1A1817] text-[#FAF8F5] border-[#1A1817] shadow-xs'
-                      : 'bg-[#FAF8F5] text-[#5C554B] border-[#E2DDD5] hover:bg-[#F5EFE3]'
-                  }`}
-                >
-                  <MessageSquare className={`h-4 w-4 ${!isEmail ? 'text-[#25D366]' : 'text-[#8C8275]'}`} />
-                  <span>WhatsApp Template</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTypeChange('WhatsApp')}
+                    className={`flex items-center justify-center gap-2.5 p-3 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+                      !isEmail
+                        ? 'bg-[#1A1817] text-[#FAF8F5] border-[#1A1817] shadow-xs'
+                        : 'bg-[#FAF8F5] text-[#5C554B] border-[#E2DDD5] hover:bg-[#F5EFE3]'
+                    }`}
+                  >
+                    <MessageSquare className={`h-4 w-4 ${!isEmail ? 'text-[#25D366]' : 'text-[#8C8275]'}`} />
+                    <span>WhatsApp Template</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : null}
 
             {/* Template Name & ID */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

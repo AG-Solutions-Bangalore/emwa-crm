@@ -1,28 +1,24 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
-import BlogModal from '../components/blog/BlogModal';
 import Pagination from '../components/common/Pagination';
-import StatusFilterToggle from '../components/common/StatusFilterToggle';
 import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import { 
   getBlogs, 
-  getBlogById, 
-  createBlog, 
-  updateBlog, 
   updateBlogStatus 
 } from '../services/blogApi';
 import { 
   Plus, 
   Search, 
   Edit2, 
+  Eye,
   RefreshCw, 
   FileText, 
   Image as ImageIcon,
   Star,
   Home,
-  Globe,
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
@@ -58,23 +54,8 @@ function formatDate(dateStr) {
   });
 }
 
-const initialForm = {
-  blog_title: '',
-  blog_slug: '',
-  blog_short_description: '',
-  blog_description: '',
-  blog_categories_ids: '',
-  blog_banner_image: null,
-  blog_banner_image_alt: '',
-  blog_meta_keywords: '',
-  blog_status: 'Active',
-  blog_index: '1',
-  blog_front: '0',
-  blog_featured: '0',
-  banner_image_url: null,
-};
-
 export default function BlogPage() {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,12 +71,6 @@ export default function BlogPage() {
   const [perPage, setPerPage] = useState(10);
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
-
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState(initialForm);
 
   /* ── 1. GET /blog with pagination ── */
   const fetchBlogs = async (page = currentPage, query = debouncedSearch, status = statusFilter) => {
@@ -157,135 +132,7 @@ export default function BlogPage() {
     }
   };
 
-  /* ── 2. CREATE (POST /blog) & UPDATE (PUT /blog/{id}) ── */
-  const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.blog_title.trim()) {
-      toast.error('Article title is required.');
-      return;
-    }
-    if (!form.blog_slug.trim()) {
-      toast.error('Article URL slug is required.');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      if (editingId) {
-        const res = await updateBlog(editingId, form);
-        toast.success(res?.message || 'Blog updated successfully.');
-
-        // Optimistically update image in table if a file was uploaded
-        if (form.blog_banner_image instanceof File) {
-          const localBlobUrl = URL.createObjectURL(form.blog_banner_image);
-          setItems((prev) =>
-            prev.map((it) =>
-              it.id === editingId
-                ? {
-                    ...it,
-                    blog_title: form.blog_title,
-                    blog_slug: form.blog_slug,
-                    blog_short_description: form.blog_short_description,
-                    blog_banner_image: localBlobUrl,
-                    banner_image: localBlobUrl,
-                    image: localBlobUrl,
-                    banner_image_url: localBlobUrl,
-                    updated_at: new Date().toISOString(),
-                  }
-                : it
-            )
-          );
-        }
-      } else {
-        const res = await createBlog(form);
-        toast.success(res?.message || 'Blog published successfully.');
-      }
-
-      setIsModalOpen(false);
-      setEditingId(null);
-      setForm(initialForm);
-      await fetchBlogs(currentPage, searchQuery, statusFilter);
-    } catch (err) {
-      toast.error(err?.response?.data?.message || 'Failed to save blog post.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  /* ── 3. EDIT (GET /blog/{id}) ── */
-  const handleOpenEdit = async (id) => {
-    const tableItem = items.find((i) => i.id === id);
-    const cleanBase = imageBaseUrl.endsWith('/') ? imageBaseUrl : `${imageBaseUrl}/`;
-
-    const resolveItemImg = (img) => {
-      if (!img) return null;
-      if (img.startsWith('http://') || img.startsWith('https://') || img.startsWith('blob:') || img.startsWith('data:')) {
-        return img;
-      }
-      return `${cleanBase}${img.startsWith('/') ? img.slice(1) : img}`;
-    };
-
-    // Open immediately with local table data for instantaneous response
-    if (tableItem) {
-      const initialImg = tableItem.blog_banner_image || tableItem.banner_image || tableItem.image || tableItem.banner_image_url;
-      setEditingId(id);
-      setForm({
-        blog_title: tableItem.blog_title || tableItem.title || tableItem.name || '',
-        blog_slug: tableItem.blog_slug || tableItem.slug || slugify(tableItem.blog_title || ''),
-        blog_short_description: tableItem.blog_short_description || tableItem.short_description || '',
-        blog_description: tableItem.blog_description || tableItem.description || '',
-        blog_categories_ids: tableItem.blog_categories_ids || tableItem.category_id || '',
-        blog_banner_image: null,
-        blog_banner_image_alt: tableItem.blog_banner_image_alt || tableItem.banner_image_alt || '',
-        blog_meta_keywords: tableItem.blog_meta_keywords || tableItem.meta_keywords || '',
-        blog_status: tableItem.blog_status || tableItem.status || 'Active',
-        blog_index: String(tableItem.blog_index ?? '1'),
-        blog_front: String(tableItem.blog_front ?? '0'),
-        blog_featured: String(tableItem.blog_featured ?? '0'),
-        banner_image_url: resolveItemImg(initialImg),
-      });
-      setIsModalOpen(true);
-    }
-
-    try {
-      const res = await getBlogById(id);
-      const data = res?.data?.data || res?.data || res?.blog || res || {};
-      const title = data?.blog_title || data?.title || data?.name || tableItem?.blog_title || '';
-      const slug = data?.blog_slug || data?.slug || data?.url_slug || data?.article_slug || tableItem?.blog_slug || slugify(title);
-      const rawImg = data?.blog_banner_image || data?.banner_image || data?.image || data?.banner_image_url || (tableItem?.blog_banner_image || tableItem?.banner_image || tableItem?.image);
-      const fullImgUrl = resolveItemImg(rawImg);
-
-      setEditingId(id);
-      setForm({
-        blog_title: title,
-        blog_slug: slug,
-        blog_short_description: data?.blog_short_description || data?.short_description || data?.excerpt || tableItem?.blog_short_description || '',
-        blog_description: data?.blog_description || data?.description || data?.content || tableItem?.blog_description || '',
-        blog_categories_ids: data?.blog_categories_ids || data?.category_id || data?.categories_id || tableItem?.blog_categories_ids || '',
-        blog_banner_image: null,
-        blog_banner_image_alt: data?.blog_banner_image_alt || data?.banner_image_alt || data?.alt_text || tableItem?.blog_banner_image_alt || '',
-        blog_meta_keywords: data?.blog_meta_keywords || data?.meta_keywords || data?.keywords || tableItem?.blog_meta_keywords || '',
-        blog_status: data?.blog_status || data?.status || tableItem?.blog_status || 'Active',
-        blog_index: String(data?.blog_index ?? data?.index ?? tableItem?.blog_index ?? '1'),
-        blog_front: String(data?.blog_front ?? data?.front ?? data?.is_home ?? tableItem?.blog_front ?? '0'),
-        blog_featured: String(data?.blog_featured ?? data?.featured ?? data?.is_featured ?? tableItem?.blog_featured ?? '0'),
-        banner_image_url: fullImgUrl,
-      });
-      setIsModalOpen(true);
-    } catch (err) {
-      if (!tableItem) {
-        toast.error('Could not load article details.');
-      }
-    }
-  };
-
-  const handleOpenCreate = () => {
-    setEditingId(null);
-    setForm(initialForm);
-    setIsModalOpen(true);
-  };
-
-  /* ── 4. PATCH /blogs/{id}/status ── */
+  /* ── 2. PATCH /blogs/{id}/status ── */
   const handleToggleStatus = async (id, currentStatus) => {
     const nextStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
 
@@ -387,7 +234,7 @@ export default function BlogPage() {
               </button>
 
               <button
-                onClick={handleOpenCreate}
+                onClick={() => navigate('/blog/create')}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition active:scale-95 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
@@ -396,7 +243,7 @@ export default function BlogPage() {
             </div>
           </div>
 
-          {/* Unique Stats Summary Cards */}
+          {/* Stats Summary Cards */}
           <StatsSummaryBar
             stats={blogStats}
             activeFilter={statusFilter}
@@ -420,16 +267,6 @@ export default function BlogPage() {
                 className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs placeholder-[#9C9488]"
               />
             </form>
-
-            <StatusFilterToggle
-              options={['All', 'Active', 'Inactive']}
-              value={statusFilter}
-              onChange={(val) => {
-                setStatusFilter(val);
-                setCurrentPage(1);
-              }}
-            />
-
           </div>
 
           {/* Blogs Table Card */}
@@ -522,7 +359,12 @@ export default function BlogPage() {
                                   </div>
                                 )}
                                 <div className="min-w-0 max-w-xs">
-                                  <span className="text-xs font-medium text-[#1A1817] block truncate">{title}</span>
+                                  <button
+                                    onClick={() => navigate(`/blog/view/${id}`)}
+                                    className="text-xs font-medium text-[#1A1817] hover:text-[#C99C4B] transition text-left block truncate cursor-pointer"
+                                  >
+                                    {title}
+                                  </button>
                                   {(item.blog_short_description || item.short_description) && (
                                     <span className="text-[11px] text-[#8C8275] block truncate mt-0.5">
                                       {item.blog_short_description || item.short_description}
@@ -582,7 +424,14 @@ export default function BlogPage() {
                             <td className="px-4 py-3 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1">
                                 <button
-                                  onClick={() => handleOpenEdit(id)}
+                                  onClick={() => navigate(`/blog/view/${id}`)}
+                                  title="View Article Overview"
+                                  className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => navigate(`/blog/edit/${id}`)}
                                   title="Edit Article"
                                   className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
                                 >
@@ -613,21 +462,6 @@ export default function BlogPage() {
 
         </main>
       </div>
-
-      {/* Create / Edit Blog Modal */}
-      <BlogModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingId(null);
-        }}
-        onSubmit={handleFormSubmit}
-        form={form}
-        setForm={setForm}
-        editingId={editingId}
-        submitting={submitting}
-        imageBaseUrl={imageBaseUrl}
-      />
     </div>
   );
 }

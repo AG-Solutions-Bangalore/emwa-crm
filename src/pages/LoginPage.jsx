@@ -11,8 +11,8 @@ export default function LoginPage() {
   const { login } = useAuthContext();
   const { companyInfo, companyLogoUrl } = useAppContext();
 
-  const [username, setUsername] = useState('9999999999');
-  const [password, setPassword] = useState('123456');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -50,17 +50,18 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-3xl border border-[#E8E3DA] bg-white p-8 sm:p-10 shadow-[0_8px_30px_-6px_rgba(30,25,20,0.06)]">
         
         <div className="mb-8 text-center">
-          {companyLogoUrl ? (
+          <div className="flex items-center justify-center mb-4">
             <img
-              src={companyLogoUrl}
-              alt={companyInfo?.company_name || 'AG Solutions'}
-              className="h-12 w-auto mx-auto object-contain mb-3"
+              src={companyLogoUrl || '/no_image.jpg'}
+              alt={companyInfo?.company_name || 'Logo'}
+              className="h-14 w-auto max-w-[200px] object-contain"
+              onError={(e) => {
+                if (e.currentTarget.src !== window.location.origin + '/no_image.jpg') {
+                  e.currentTarget.src = '/no_image.jpg';
+                }
+              }}
             />
-          ) : (
-            <div className="h-12 w-12 rounded-2xl bg-[#1A1817] text-[#FAF8F5] font-display font-bold mx-auto flex items-center justify-center text-xl mb-3 shadow-xs">
-              {companyInfo?.company_short || 'AGS'}
-            </div>
-          )}
+          </div>
           <h1 className="font-display text-2xl font-bold text-[#1A1817] tracking-tight">
             {companyInfo?.company_name || 'AG Solutions'}
           </h1>
@@ -78,14 +79,14 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">Username / Mobile</label>
+            <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">Mobile Number</label>
             <div className="relative flex items-center">
               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9C9488] pointer-events-none" />
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username..."
+                placeholder="Enter mobile number..."
                 className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs"
                 required
               />
