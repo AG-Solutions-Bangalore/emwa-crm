@@ -158,10 +158,10 @@ export const Sidebar = () => {
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-xs font-bold text-[#1A1817] truncate tracking-tight">
-                    {companyInfo?.company_name || 'AG Solutions'}
+                    {companyInfo?.company_name || 'Admin Portal'}
                   </h1>
                   <p className="text-[11px] font-medium tracking-wide text-[#8C8275]">
-                    Admin Portal
+                    {companyInfo?.company_short ? `${companyInfo.company_short} Portal` : 'Admin Portal'}
                   </p>
                 </div>
               </div>
@@ -237,9 +237,11 @@ export const Sidebar = () => {
                 <div className="text-sm font-semibold text-[#1A1817] truncate transition">
                   {user?.name || user?.username || 'admin'}
                 </div>
-                <div className="text-xs text-[#8C8275] truncate">
-                  {companyInfo?.company_place || 'Bangalore'}
-                </div>
+                {companyInfo?.company_place && (
+                  <div className="text-xs text-[#8C8275] truncate">
+                    {companyInfo.company_place}
+                  </div>
+                )}
               </div>
             )}
           </div>

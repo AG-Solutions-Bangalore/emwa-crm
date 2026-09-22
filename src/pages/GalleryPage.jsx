@@ -99,7 +99,7 @@ export default function GalleryPage() {
         i?.image_for?.toLowerCase() === 'gallery_image' ||
         i?.image_for?.toLowerCase() === 'gallery_images'
     );
-    return found?.image_url || 'https://easemarketing.in/emwaapi/public/assets/images/gallerys_images/';
+    return found?.image_url || 'https://agsdemo.in/ckapi/public/assets/images/gallerys_images/';
   }, [apiGalleryBaseUrl, imageUrlConfig]);
 
   // Resolve full image URL helper

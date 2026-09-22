@@ -159,7 +159,7 @@ export const deleteContact = async (id) => {
   }
 };
 
-export const CONTACT_TEMPLATE_URL = 'https://easemarketing.in/emwaapi/public/assets/import/contact_formate.xlsx';
+export const CONTACT_TEMPLATE_URL = 'https://agsdemo.in/ckapi/public/assets/import/contact_formate.xlsx';
 
 export default {
   getContacts,

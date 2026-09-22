@@ -5,7 +5,7 @@ const TOKEN_KEY = 'emwa_crm_token';
 const getBaseURL = () => {
   const envBaseURL =
     import.meta.env.VITE_API_BASE_URL ||
-    'https://easemarketing.in/emwaapi/public/api';
+    'https://agsdemo.in/ckapi/public/api';
 
   return envBaseURL.replace(/\/$/, '');
 };
@@ -26,6 +26,22 @@ api.interceptors.request.use((config) => {
 
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      const isPublicRoute =
+        window.location.pathname === '/login' || window.location.pathname === '/forgot-password';
+      if (!isPublicRoute) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem('emwa_crm_user');
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 /**
  * 1. panel-check-status
