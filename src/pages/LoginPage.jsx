@@ -63,10 +63,10 @@ export default function LoginPage() {
             />
           </div>
           <h1 className="font-display text-2xl font-bold text-[#1A1817] tracking-tight">
-            {companyInfo?.company_name || 'AG Solutions'}
+            {companyInfo?.company_name || 'Admin Portal'}
           </h1>
           <p className="text-xs text-[#78716C] mt-1">
-            EMWA CRM <span className="text-[#C99C4B] mx-1">•</span> Admin Access Portal
+            {companyInfo?.company_short ? `${companyInfo.company_short} • ` : ''}Admin Access Portal
           </p>
         </div>
 

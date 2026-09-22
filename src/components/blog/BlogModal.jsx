@@ -13,7 +13,7 @@ function slugify(text) {
     .replace(/^-+|-+$/g, '');
 }
 
-function resolveImageUrl(url, baseUrl = 'https://easemarketing.in/emwaapi/public/assets/images/blog_images/') {
+function resolveImageUrl(url, baseUrl = 'https://agsdemo.in/ckapi/public/assets/images/blog_images/') {
   if (!url) return null;
   if (url.startsWith('blob:') || url.startsWith('data:')) {
     return url;
@@ -36,7 +36,7 @@ export default function BlogModal({
   setForm,
   editingId,
   submitting,
-  imageBaseUrl = 'https://easemarketing.in/emwaapi/public/assets/images/blog_images/',
+  imageBaseUrl = 'https://agsdemo.in/ckapi/public/assets/images/blog_images/',
 }) {
   const [categories, setCategories] = useState([]);
   const [activeTab, setActiveTab] = useState('general');

@@ -60,7 +60,7 @@ export default function BlogPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [imageBaseUrl, setImageBaseUrl] = useState('https://easemarketing.in/emwaapi/public/assets/images/blog_images/');
+  const [imageBaseUrl, setImageBaseUrl] = useState('https://agsdemo.in/ckapi/public/assets/images/blog_images/');
 
   const debouncedSearch = useDebounce(searchQuery, 350);
 

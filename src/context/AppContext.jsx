@@ -110,6 +110,27 @@ export function AppProvider({ children }) {
     return noImgObj?.image_url || '/no_image.jpg';
   }, [imageUrlConfig]);
 
+  /** Dynamically sync document title and browser tab favicon from backend company data */
+  useEffect(() => {
+    if (companyInfo?.company_name) {
+      document.title = `${companyInfo.company_name} - Admin Portal`;
+    } else {
+      document.title = 'Admin Portal';
+    }
+
+    if (companyLogoUrl && companyLogoUrl !== '/no_image.jpg') {
+      let faviconEl = document.querySelector("link[rel*='icon']");
+      if (faviconEl) {
+        faviconEl.href = companyLogoUrl;
+      } else {
+        faviconEl = document.createElement('link');
+        faviconEl.rel = 'icon';
+        faviconEl.href = companyLogoUrl;
+        document.head.appendChild(faviconEl);
+      }
+    }
+  }, [companyInfo, companyLogoUrl]);
+
   const value = useMemo(
     () => ({
       appStatus,

@@ -96,7 +96,7 @@ export default function ClientPage() {
         i?.image_for?.toLowerCase() === 'client_image' ||
         i?.image_for?.toLowerCase() === 'client_images'
     );
-    return found?.image_url || 'https://easemarketing.in/emwaapi/public/assets/images/client_images/';
+    return found?.image_url || 'https://agsdemo.in/ckapi/public/assets/images/client_images/';
   }, [imageUrlConfig]);
 
   const resolveImageUrl = (imageVal) => {
