@@ -5,7 +5,6 @@ import ContactModal from '../components/contact/ContactModal';
 import ContactImportModal from '../components/contact/ContactImportModal';
 import ContactViewModal from '../components/contact/ContactViewModal';
 import Pagination from '../components/common/Pagination';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import {
   getContacts,
@@ -346,16 +345,6 @@ export default function ContactPage() {
             </div>
           </div>
 
-          {/* Unique Stats Summary Cards */}
-          <StatsSummaryBar
-            stats={contactStats}
-            activeFilter={statusFilter}
-            onSelectFilter={(filter) => {
-              setStatusFilter(filter);
-              setCurrentPage(1);
-            }}
-          />
-
           {/* Search & Filter Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
@@ -402,7 +391,7 @@ export default function ContactPage() {
                 <table className="w-full text-left text-xs text-[#3D372E]">
                   <thead className="bg-[#F7F4EE] border-b border-[#E8E3DA] text-xs uppercase font-semibold text-[#78716C] tracking-wider">
                     <tr>
-                      <th className="px-4 py-2.5 w-14">#</th>
+                      <th className="px-4 py-2.5 w-16">Sl.No</th>
                       <th className="px-4 py-2.5">Contact</th>
                       {hasWhatsApp && <th className="px-4 py-2.5">Mobile</th>}
                       <th className="px-4 py-2.5">Address</th>

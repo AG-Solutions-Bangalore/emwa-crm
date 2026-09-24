@@ -456,7 +456,7 @@ export default function EmailCampaignViewPage() {
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="border-b border-[#E8E3DA] bg-[#FAF8F5] font-semibold text-[#5C554B]">
-                          <th className="px-5 py-3 w-14 text-center">#</th>
+                          <th className="px-5 py-3 w-16 text-center">Sl.No</th>
                           <th className="px-5 py-3">Recipient Email</th>
                           <th className="px-5 py-3">Group</th>
                           <th className="px-5 py-3">Scheduled Date</th>

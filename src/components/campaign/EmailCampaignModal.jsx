@@ -321,8 +321,8 @@ export default function EmailCampaignModal({
                 onChange={(e) => setFormData({ ...formData, email_campaign_holiday: e.target.value })}
                 className="w-full rounded-xl border border-[#E8E3DA] bg-white px-3.5 py-2.5 text-xs text-[#1A1817] outline-none transition focus:ring-2 focus:ring-[#C99C4B]/20 focus:border-[#C99C4B]"
               >
-                <option value="Yes">Yes (Skip delivery on registered holidays)</option>
-                <option value="No">No (Send regardless of holidays)</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
               </select>
               <p className="mt-1 text-[11px] text-[#8C8275]">
                 Default is set to <span className="font-semibold text-[#1A1817]">Yes</span>.

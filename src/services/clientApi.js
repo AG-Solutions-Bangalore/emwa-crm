@@ -23,12 +23,11 @@ function buildClientFormData(payload, isUpdate = false) {
     formData.append('clients_image', image);
   }
 
-  const status = payload?.clients_status || payload?.client_status || payload?.status;
-  if (status) {
-    formData.append('clients_status', String(status).trim());
-  }
-
   if (isUpdate) {
+    const status = payload?.clients_status || payload?.client_status || payload?.status;
+    if (status) {
+      formData.append('clients_status', String(status).trim());
+    }
     formData.append('_method', 'PUT');
   }
 

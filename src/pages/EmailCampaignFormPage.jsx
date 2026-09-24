@@ -571,9 +571,9 @@ export default function EmailCampaignFormPage() {
                       }
                       className="w-full sm:w-64 rounded-xl border border-[#E8E3DA] bg-[#FAF8F5] px-3.5 py-2.5 text-xs sm:text-sm text-[#1A1817] outline-none transition focus:bg-white focus:border-[#C99C4B] cursor-pointer"
                     >
-                      <option value="Pending">Pending (Queued)</option>
-                      <option value="Sent">Sent (Delivered)</option>
-                      <option value="Hold">Hold (Paused)</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Sent">Sent</option>
+                      <option value="Hold">Hold</option>
                     </select>
                   </div>
                 </div>

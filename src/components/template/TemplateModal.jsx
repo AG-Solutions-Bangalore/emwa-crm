@@ -201,7 +201,7 @@ export default function TemplateModal({
 
               <div>
                 <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                  Template ID {isEmail ? <span className="text-[11px] text-[#8C8275] font-normal">(Auto-synced with name)</span> : <span className="text-[#9A2D2D]">*</span>}
+                  Template ID {isEmail ? <span className="text-[11px] text-[#8C8275] font-normal">• Auto-synced with name</span> : <span className="text-[#9A2D2D]">*</span>}
                 </label>
                 <input
                   type="text"

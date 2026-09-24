@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { hasEmail } = useAuthContext();
+  const { hasEmail, isAdmin } = useAuthContext();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -66,22 +66,26 @@ export default function DashboardPage() {
 
   // Stats Summary Bar Cards matching the CRM system design
   const dashboardStats = useMemo(() => {
-    const stats = [
-      {
+    const stats = [];
+
+    // Message Templates belongs to Marketing -> Admin only
+    if (isAdmin) {
+      stats.push({
         label: 'Message Templates',
         value: templateCount,
         icon: LayoutTemplate,
         color: 'emerald',
         filterValue: 'template',
-      },
-      {
-        label: 'Customer Enquiries',
-        value: enquiryCount,
-        icon: MessageSquareText,
-        color: 'amber',
-        filterValue: 'enquiry',
-      },
-    ];
+      });
+    }
+
+    stats.push({
+      label: 'Customer Enquiries',
+      value: enquiryCount,
+      icon: MessageSquareText,
+      color: 'amber',
+      filterValue: 'enquiry',
+    });
 
     if (hasEmail) {
       stats.push({
@@ -94,7 +98,7 @@ export default function DashboardPage() {
     }
 
     return stats;
-  }, [templateCount, enquiryCount, newsletterCount, hasEmail]);
+  }, [templateCount, enquiryCount, newsletterCount, hasEmail, isAdmin]);
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F0] text-[#1A1817]">

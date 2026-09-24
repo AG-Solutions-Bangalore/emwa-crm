@@ -26,7 +26,7 @@ export const getCompanyDetails = async () => {
  * Update company information (FormData supported for logo uploads)
  */
 export const updateCompanyDetails = async (payload) => {
-  let body;
+  let body = payload;
 
   if (payload instanceof FormData) {
     body = payload;

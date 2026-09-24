@@ -365,7 +365,7 @@ export default function TemplateFormPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                    Template ID {isEmail ? <span className="text-[11px] text-[#8C8275] font-normal">(Auto-synced with name)</span> : <span className="text-[#9A2D2D]">*</span>}
+                    Template ID {isEmail ? <span className="text-[11px] text-[#8C8275] font-normal">• Auto-synced with name</span> : <span className="text-[#9A2D2D]">*</span>}
                   </label>
                   <input
                     type="text"
@@ -518,8 +518,8 @@ export default function TemplateFormPage() {
                     onChange={handleInputChange}
                     className="w-full sm:w-64 px-4 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs cursor-pointer"
                   >
-                    <option value="Active">Active (Available in Campaigns)</option>
-                    <option value="Inactive">Inactive (Disabled)</option>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
                   </select>
                 </div>
               )}

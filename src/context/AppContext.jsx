@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { checkPanelStatus } from '../services/api';
+import { checkPanelStatus, getAssetBaseURL } from '../services/api';
 import { encryptData, decryptData, encryptId, decryptId, secureStorage } from '../utils/crypto';
 
 const AppContext = createContext(null);
@@ -88,7 +88,8 @@ export function AppProvider({ children }) {
     const companyImgObj = (imageUrlConfig || []).find(
       (i) => i.image_for?.toLowerCase() === 'company'
     );
-    const baseUrl = companyImgObj?.image_url || 'https://easemarketing.in/emwaapi/public/assets/images/company_images/';
+    const fallbackBase = getAssetBaseURL('/assets/images/company_images/');
+    const baseUrl = companyImgObj?.image_url || fallbackBase;
     if (
       companyInfo.company_logo.startsWith('http://') ||
       companyInfo.company_logo.startsWith('https://') ||

@@ -1,17 +1,6 @@
 import React from 'react';
-import { X, MessageSquare, Clock } from 'lucide-react';
+import { X, MessageSquare, Globe, Tag } from 'lucide-react';
 import { useAuthContext } from '../../context/AuthContext';
-
-function formatDate(dateStr) {
-  if (!dateStr) return 'N/A';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return String(dateStr);
-  return d.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 function getStatusBadge(status) {
   const s = String(status || '').toLowerCase();
@@ -31,14 +20,19 @@ export default function EnquiryDetailsModal({ isOpen, onClose, enquiry, loading 
   const { hasEmail, hasWhatsApp } = useAuthContext();
   if (!isOpen) return null;
 
+  const id = enquiry?.id;
   const status = enquiry?.enquiryStatus || enquiry?.enquiry_status || enquiry?.status || 'Pending';
-  const name = enquiry?.enquiryFullName || enquiry?.full_name || enquiry?.name || 'N/A';
+  const name = enquiry?.enquiryFullName || enquiry?.full_name || enquiry?.fullName || enquiry?.name || 'N/A';
   const mobile = enquiry?.enquiryMobile || enquiry?.mobile || 'N/A';
   const email = enquiry?.enquiryEmail || enquiry?.email || 'N/A';
-  const message = enquiry?.enquiryMessage || enquiry?.message || 'No additional message.';
-  const occasion = enquiry?.occasion || enquiry?.occasion_name || enquiry?.enquiryOccasion || 'N/A';
-  const weddingDate = enquiry?.enquiryWeddingDate || enquiry?.wedding_date || enquiry?.weddingDate;
-  const createdAt = enquiry?.created_at || enquiry?.createdDate || enquiry?.enquiryCreatedDate;
+  const service = enquiry?.enquiryService || enquiry?.service || enquiry?.service_name || 'N/A';
+  const enquiryFrom = enquiry?.enquiryFrom || enquiry?.enquiry_from || '';
+  const message = enquiry?.enquiryMessage || enquiry?.message || 'No message provided.';
+  const utmMedium = enquiry?.utm_medium || '';
+  const utmSource = enquiry?.utm_source || '';
+  const utmCampaign = enquiry?.utm_campaign || '';
+
+  const hasUtm = Boolean(utmSource || utmMedium || utmCampaign);
 
   return (
     <div
@@ -57,7 +51,7 @@ export default function EnquiryDetailsModal({ isOpen, onClose, enquiry, loading 
             </div>
             <div>
               <h3 className="font-display text-base sm:text-lg font-bold text-[#1A1817] tracking-tight">
-                Enquiry #{enquiry?.id || ''}
+                Enquiry #{id || ''}
               </h3>
               <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium border mt-0.5 ${getStatusBadge(status)}`}>
                 {status}
@@ -84,62 +78,69 @@ export default function EnquiryDetailsModal({ isOpen, onClose, enquiry, loading 
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Customer Name</span>
+                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Full Name</span>
                   <span className="font-semibold text-[#1A1817] text-sm">{name}</span>
                 </div>
 
-                {hasWhatsApp ? (
+                {hasWhatsApp && (
                   <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
                     <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Mobile</span>
-                    <span className="font-semibold text-[#1A1817] text-sm">{mobile}</span>
-                  </div>
-                ) : (
-                  <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                    <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Occasion / Event</span>
-                    <span className="font-semibold text-[#1A1817] text-sm">{occasion}</span>
+                    <span className="font-semibold text-[#1A1817] text-sm font-mono">{mobile}</span>
                   </div>
                 )}
+
+                {hasEmail && (
+                  <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                    <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Email</span>
+                    <span className="font-semibold text-[#1A1817] text-sm break-all">{email}</span>
+                  </div>
+                )}
+
+                <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
+                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Service</span>
+                  <span className="font-semibold text-[#1A1817] text-sm">{service}</span>
+                </div>
               </div>
 
-              {hasWhatsApp ? (
-                <div className="grid grid-cols-2 gap-3.5">
-                  {hasEmail && (
-                    <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                      <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Email</span>
-                      <span className="font-semibold text-[#1A1817] text-sm break-all">{email}</span>
-                    </div>
-                  )}
-
-                  <div className={`p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA] ${!hasEmail ? 'col-span-2' : ''}`}>
-                    <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Occasion / Event</span>
-                    <span className="font-semibold text-[#1A1817] text-sm">{occasion}</span>
-                  </div>
-                </div>
-              ) : hasEmail ? (
+              {enquiryFrom && (
                 <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Email</span>
-                  <span className="font-semibold text-[#1A1817] text-sm break-all">{email}</span>
-                </div>
-              ) : null}
-
-              {weddingDate && (
-                <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Event / Wedding Date</span>
-                  <span className="font-semibold text-[#1A1817] text-sm">{formatDate(weddingDate)}</span>
+                  <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1 flex items-center gap-1.5">
+                    <Globe className="h-3.5 w-3.5 text-[#9E7432]" />
+                    <span>Enquiry From</span>
+                  </span>
+                  <p className="text-[#3D372E] text-xs font-medium leading-relaxed break-all bg-white p-2 rounded-lg border border-[#E8E3DA]">
+                    {enquiryFrom}
+                  </p>
                 </div>
               )}
 
               <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA]">
-                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Customer Message</span>
+                <span className="text-xs uppercase font-semibold text-[#8C8275] block mb-1">Message</span>
                 <p className="text-[#3D372E] text-sm leading-relaxed whitespace-pre-wrap">{message}</p>
               </div>
 
-              {createdAt && (
-                <div className="flex items-center gap-1.5 text-[#8C8275] text-xs pt-1">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>Submitted on {formatDate(createdAt)}</span>
+              {hasUtm && (
+                <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA] space-y-2">
+                  <span className="text-xs uppercase font-semibold text-[#8C8275] block flex items-center gap-1.5">
+                    <Tag className="h-3.5 w-3.5 text-[#9E7432]" />
+                    <span>Campaign & Tracking (UTM)</span>
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                    <div className="bg-white p-2.5 rounded-lg border border-[#E8E3DA]">
+                      <span className="text-[10px] uppercase font-bold text-[#8C8275] block">Source</span>
+                      <span className="text-xs font-medium text-[#1A1817] font-mono">{utmSource || '—'}</span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-lg border border-[#E8E3DA]">
+                      <span className="text-[10px] uppercase font-bold text-[#8C8275] block">Medium</span>
+                      <span className="text-xs font-medium text-[#1A1817] font-mono">{utmMedium || '—'}</span>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-lg border border-[#E8E3DA]">
+                      <span className="text-[10px] uppercase font-bold text-[#8C8275] block">Campaign</span>
+                      <span className="text-xs font-medium text-[#1A1817] font-mono">{utmCampaign || '—'}</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -161,4 +162,3 @@ export default function EnquiryDetailsModal({ isOpen, onClose, enquiry, loading 
     </div>
   );
 }
-

@@ -50,9 +50,19 @@ export const deleteEnquiry = async (id) => {
   return response.data;
 };
 
+/**
+ * 5. GET /getEnquiryReport
+ * Fetch enquiry report for export or analysis
+ */
+export const getEnquiryReport = async (params = {}) => {
+  const response = await api.get('/getEnquiryReport', { params });
+  return response.data;
+};
+
 export default {
   getEnquiries,
   getEnquiryById,
   updateEnquiryStatus,
   deleteEnquiry,
+  getEnquiryReport,
 };

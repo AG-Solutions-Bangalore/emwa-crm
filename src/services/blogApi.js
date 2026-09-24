@@ -68,15 +68,31 @@ function buildBlogFormData(data) {
   }
 
   if (data.blog_front !== undefined && data.blog_front !== null) {
-    formData.append('blog_front', String(data.blog_front));
-    formData.append('front', String(data.blog_front));
-    formData.append('is_home', String(data.blog_front));
+    const isFrontTrue = data.blog_front === true || String(data.blog_front) === '1' || String(data.blog_front).toLowerCase() === 'yes' || data.blog_front === 'Active';
+    const frontVal = isFrontTrue ? '1' : '0';
+    formData.append('blog_front', frontVal);
+    formData.append('front', frontVal);
+    formData.append('is_home', frontVal);
+  } else if (data.front !== undefined && data.front !== null) {
+    const isFrontTrue = data.front === true || String(data.front) === '1' || String(data.front).toLowerCase() === 'yes' || data.front === 'Active';
+    const frontVal = isFrontTrue ? '1' : '0';
+    formData.append('blog_front', frontVal);
+    formData.append('front', frontVal);
+    formData.append('is_home', frontVal);
   }
 
   if (data.blog_featured !== undefined && data.blog_featured !== null) {
-    formData.append('blog_featured', String(data.blog_featured));
-    formData.append('featured', String(data.blog_featured));
-    formData.append('is_featured', String(data.blog_featured));
+    const isFeaturedTrue = data.blog_featured === true || String(data.blog_featured) === '1' || String(data.blog_featured).toLowerCase() === 'yes' || data.blog_featured === 'Active';
+    const featuredVal = isFeaturedTrue ? '1' : '0';
+    formData.append('blog_featured', featuredVal);
+    formData.append('featured', featuredVal);
+    formData.append('is_featured', featuredVal);
+  } else if (data.featured !== undefined && data.featured !== null) {
+    const isFeaturedTrue = data.featured === true || String(data.featured) === '1' || String(data.featured).toLowerCase() === 'yes' || data.featured === 'Active';
+    const featuredVal = isFeaturedTrue ? '1' : '0';
+    formData.append('blog_featured', featuredVal);
+    formData.append('featured', featuredVal);
+    formData.append('is_featured', featuredVal);
   }
 
   // Handle image file upload (check all possible file keys)
@@ -116,17 +132,43 @@ export const getBlogs = async (params = {}) => {
  */
 export const createBlog = async (payload) => {
   const formData = buildBlogFormData(payload);
-  const response = await api.post('/blog', formData);
+  const response = await api.post('/blog', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return response.data;
 };
 
+function extractBlogList(response) {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.data?.data)) return response.data.data;
+  if (Array.isArray(response?.data)) return response.data;
+  if (Array.isArray(response?.blogs?.data)) return response.blogs.data;
+  if (Array.isArray(response?.blogs)) return response.blogs;
+  if (Array.isArray(response?.blog)) return response.blog;
+  return [];
+}
+
 /**
  * 3. GET /blog/{id}
- * Fetch single blog by ID
+ * Fetch single blog by ID with robust fallback
  */
 export const getBlogById = async (id) => {
-  const response = await api.get(`/blog/${id}`);
-  return response.data;
+  try {
+    const response = await api.get(`/blog/${id}`);
+    return response.data;
+  } catch (err) {
+    try {
+      const fallbackList = await api.get('/blog');
+      const list = extractBlogList(fallbackList.data);
+      const found = list.find((b) => String(b.id) === String(id));
+      if (found) {
+        return { data: found, image_url: fallbackList.data?.image_url };
+      }
+    } catch (fallbackErr) {
+      // ignore
+    }
+    throw err;
+  }
 };
 
 /**
@@ -140,12 +182,26 @@ export const updateBlog = async (id, payload) => {
   }
 
   try {
-    const response = await api.post(`/blog/${id}`, formData);
+    const response = await api.post(`/blog/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   } catch (err) {
-    // Fallback direct PUT request
-    const response = await api.put(`/blog/${id}`, formData);
-    return response.data;
+    try {
+      const response = await api.post(`/blogs/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (err2) {
+      try {
+        const response = await api.put(`/blog/${id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
+      } catch (err3) {
+        throw err;
+      }
+    }
   }
 };
 

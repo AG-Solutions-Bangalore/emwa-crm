@@ -4,28 +4,27 @@ import Header from '../components/layout/Header';
 import GalleryModal from '../components/gallery/GalleryModal';
 import GalleryImageViewModal from '../components/gallery/GalleryImageViewModal';
 import Pagination from '../components/common/Pagination';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import { useAppContext } from '../context/AppContext';
 import {
   getGalleries,
-  getGalleryById,
   createGallery,
   updateGallery,
   updateGalleryStatus,
 } from '../services/galleryApi';
+import { getAssetBaseURL } from '../services/api';
 import {
   Plus,
   Search,
-  Edit2,
   RefreshCw,
   Image as ImageIcon,
   LayoutGrid,
   List,
-  Eye,
+  Edit2,
   CheckCircle2,
   XCircle,
-  Layers,
+  Copy,
+  Check,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -40,22 +39,9 @@ function extractList(response) {
   return [];
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return String(dateStr);
-  return d.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
 const initialForm = {
   gallery_image: null,
   gallery_images: [],
-  gallery_status: 'Active',
-  existing_image_url: null,
 };
 
 export default function GalleryPage() {
@@ -77,9 +63,9 @@ export default function GalleryPage() {
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
 
-  // Modal State (Create / Edit)
+  // Upload/Edit Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(initialForm);
 
@@ -99,22 +85,57 @@ export default function GalleryPage() {
         i?.image_for?.toLowerCase() === 'gallery_image' ||
         i?.image_for?.toLowerCase() === 'gallery_images'
     );
-    return found?.image_url || 'https://agsdemo.in/ckapi/public/assets/images/gallerys_images/';
+    const fallbackBase = getAssetBaseURL('/assets/images/gallerys_images/');
+    return found?.image_url || fallbackBase;
   }, [apiGalleryBaseUrl, imageUrlConfig]);
 
   // Resolve full image URL helper
   const resolveImageUrl = (imageVal, itemObj = null) => {
     const targetObj = typeof imageVal === 'object' && imageVal !== null ? imageVal : itemObj;
-    const rawVal = typeof imageVal === 'string' ? imageVal : (targetObj?.gallery_image || targetObj?.image || targetObj?.file_name);
+    const rawVal = typeof imageVal === 'string' ? imageVal : (targetObj?.gallery_image || targetObj?.image || targetObj?.file_name || targetObj?.photo || targetObj?.gallery_photo);
     
     if (!rawVal) return noImageUrl || '';
+    const cacheBuster = targetObj?.updated_at ? new Date(targetObj.updated_at).getTime() : (targetObj?.id || '');
     if (rawVal.startsWith('http://') || rawVal.startsWith('https://') || rawVal.startsWith('data:') || rawVal.startsWith('blob:')) {
-      return rawVal;
+      const sep = rawVal.includes('?') ? '&' : '?';
+      return cacheBuster ? `${rawVal}${sep}t=${cacheBuster}` : rawVal;
     }
 
     const baseUrl = targetObj?.gallery_url || targetObj?.image_url || galleryBaseUrl;
     const cleanBase = String(baseUrl).replace(/\/$/, '');
-    return `${cleanBase}/${String(rawVal).replace(/^\//, '')}`;
+    const cleanPath = String(rawVal).replace(/^\//, '');
+    const sep = cleanPath.includes('?') ? '&' : '?';
+    return cacheBuster ? `${cleanBase}/${cleanPath}${sep}t=${cacheBuster}` : `${cleanBase}/${cleanPath}`;
+  };
+
+  const [copiedId, setCopiedId] = useState(null);
+
+  const handleCopyLink = async (url, id) => {
+    if (!url) {
+      toast.error('Image URL is not available.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(id);
+      toast.success('Image link copied to clipboard!');
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (err) {
+      // Fallback if clipboard API fails
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopiedId(id);
+        toast.success('Image link copied to clipboard!');
+        setTimeout(() => setCopiedId(null), 2000);
+      } catch (e) {
+        toast.error('Failed to copy image link.');
+      }
+    }
   };
 
   /* ── 1. GET /gallery with pagination ── */
@@ -183,43 +204,25 @@ export default function GalleryPage() {
     }
   };
 
-  /* ── 2. CREATE (POST /gallery) & UPDATE (PUT /gallery/{id}) ── */
+  /* ── 2. CREATE & EDIT (POST & PUT /gallery) ── */
   const handleOpenCreateModal = () => {
-    setEditingId(null);
+    setEditingItem(null);
     setForm(initialForm);
     setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = async (item) => {
-    setEditingId(item.id);
-    setIsModalOpen(true);
-
+  const handleOpenEditModal = (item) => {
+    setEditingItem(item);
     const imageField = item.gallery_image || item.image || item.photo || item.gallery || item.file_name || item.gallery_photo || item.image_name;
-    const currentStatus = item.gallery_status || item.status || 'Active';
-
+    const imageUrl = resolveImageUrl(imageField, item);
     setForm({
       gallery_image: null,
       gallery_images: [],
-      gallery_status: currentStatus,
-      existing_image_url: resolveImageUrl(imageField),
+      gallery_status: item.gallery_status || item.status || 'Active',
+      existingImage: imageUrl,
+      fileName: imageField || `Photo #${item.id}`,
     });
-
-    try {
-      const res = await getGalleryById(item.id);
-      const freshData = res?.data || res?.gallery || res;
-      if (freshData) {
-        const freshImage = freshData.gallery_image || freshData.image || freshData.photo || freshData.gallery || freshData.file_name || freshData.gallery_photo || freshData.image_name;
-        const freshStatus = freshData.gallery_status || freshData.status || currentStatus;
-        setForm({
-          gallery_image: null,
-          gallery_images: [],
-          gallery_status: freshStatus,
-          existing_image_url: resolveImageUrl(freshImage),
-        });
-      }
-    } catch (err) {
-      // Keep state from table item
-    }
+    setIsModalOpen(true);
   };
 
   const handleFormSubmit = async (e) => {
@@ -227,9 +230,14 @@ export default function GalleryPage() {
     setSubmitting(true);
 
     try {
-      if (editingId) {
-        // PUT /gallery/{id}
-        await updateGallery(editingId, form);
+      if (editingItem) {
+        // Edit / Replace existing photo or update status
+        const fileToUpload = form.gallery_image || (Array.isArray(form.gallery_images) && form.gallery_images.length > 0 ? form.gallery_images[0] : null);
+
+        await updateGallery(editingItem.id, {
+          gallery_image: fileToUpload,
+          gallery_status: form.gallery_status || editingItem.gallery_status || 'Active',
+        });
         toast.success('Gallery photo updated successfully.');
       } else {
         // POST /gallery (supports multiple photo batch upload)
@@ -248,7 +256,6 @@ export default function GalleryPage() {
         if (filesToUpload.length === 1) {
           await createGallery({
             gallery_image: filesToUpload[0],
-            gallery_status: form.gallery_status,
           });
           toast.success('Gallery photo uploaded successfully.');
         } else {
@@ -259,7 +266,6 @@ export default function GalleryPage() {
             try {
               await createGallery({
                 gallery_image: file,
-                gallery_status: form.gallery_status,
               });
               successCount++;
             } catch (err) {
@@ -276,6 +282,7 @@ export default function GalleryPage() {
       }
 
       setIsModalOpen(false);
+      setEditingItem(null);
       setForm(initialForm);
       fetchGalleryList(currentPage, searchQuery, statusFilter);
     } catch (err) {
@@ -398,16 +405,6 @@ export default function GalleryPage() {
             </div>
           </div>
 
-          {/* Unique Stats Summary Cards */}
-          <StatsSummaryBar
-            stats={galleryStats}
-            activeFilter={statusFilter}
-            onSelectFilter={(filter) => {
-              setStatusFilter(filter);
-              setCurrentPage(1);
-            }}
-          />
-
           {/* Search & Filter Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
@@ -417,7 +414,7 @@ export default function GalleryPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search gallery by ID or keyword..."
+                placeholder="Search gallery ..."
                 className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
@@ -488,14 +485,13 @@ export default function GalleryPage() {
                   const imageUrl = resolveImageUrl(imageField, item);
                   const status = item.gallery_status || item.status || 'Active';
                   const isActive = status === 'Active';
-                  const date = item.created_at || item.createdDate || item.created_date || item.date || item.gallery_date || item.createdAt || item.updated_at || item.updatedAt || item.gallery_created_at || item.timestamp;
 
                   return (
                     <div
                       key={item.id || index}
                       className="group bg-white rounded-xl border border-[#E8E3DA] overflow-hidden shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col"
                     >
-                      {/* Image Thumbnail with Overlay Hover Actions */}
+                      {/* Image Thumbnail with Overlay Hover Action */}
                       <div className="relative aspect-4/3 bg-[#F7F4EE] overflow-hidden">
                         {imageUrl ? (
                           <img
@@ -512,23 +508,15 @@ export default function GalleryPage() {
                           </div>
                         )}
 
-                        {/* Hover Overlay Controls (Quick Preview & Edit) */}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                        {/* Hover Overlay Control (Quick Preview) */}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                           <button
                             type="button"
                             onClick={() => handleOpenPreview(item)}
                             title="Quick Preview"
-                            className="p-2 rounded-full bg-white/90 hover:bg-white text-[#1A1817] shadow-md transition transform hover:scale-110 cursor-pointer"
+                            className="p-2.5 rounded-full bg-white/95 hover:bg-white text-[#1A1817] shadow-md transition transform hover:scale-110 cursor-pointer"
                           >
                             <Eye className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(item)}
-                            title="Edit Photo"
-                            className="p-2 rounded-full bg-white/90 hover:bg-white text-[#1A1817] shadow-md transition transform hover:scale-110 cursor-pointer"
-                          >
-                            <Edit2 className="h-4 w-4 text-[#9E7432]" />
                           </button>
                         </div>
 
@@ -561,18 +549,30 @@ export default function GalleryPage() {
 
                       {/* Card Info Footer */}
                       <div className="p-3 bg-white flex items-center justify-between border-t border-[#F0ECE3] text-[11px] text-[#78716C]">
-                        <span className="truncate max-w-[140px] font-medium text-[#1A1817]">
-                          Photo #{item.id}
+                        <span className="truncate max-w-[130px] font-medium text-[#1A1817]" title={imageField || `Photo #${item.id}`}>
+                          {imageField || `Photo #${item.id}`}
                         </span>
 
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => handleOpenEditModal(item)}
+                            onClick={() => handleCopyLink(imageUrl, item.id)}
                             className="p-1 rounded hover:bg-[#FAF8F5] text-[#5C554B] hover:text-[#1A1817] transition cursor-pointer"
+                            title="Copy Image URL"
+                          >
+                            {copiedId === item.id ? (
+                              <Check className="h-3.5 w-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(item)}
+                            className="p-1 rounded hover:bg-[#FAF8F5] text-[#5C554B] hover:text-[#9E7432] transition cursor-pointer"
                             title="Edit Photo"
                           >
-                            <Edit2 className="h-3.5 w-3.5 text-[#9E7432]" />
+                            <Edit2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
@@ -602,11 +602,11 @@ export default function GalleryPage() {
                 <table className="w-full text-left text-xs text-[#3D372E] border-collapse">
                   <thead className="bg-[#FAF8F5] border-b border-[#E8E3DA] text-xs uppercase font-semibold text-[#78716C] tracking-wider">
                     <tr>
-                      <th className="px-4 py-3 w-[6%] min-w-[50px]">#</th>
-                      <th className="px-4 py-3 w-[16%] min-w-[100px]">Preview</th>
-                      <th className="px-4 py-3 w-[44%]">Photo Details</th>
-                      <th className="px-4 py-3 w-[22%] min-w-[120px]">Status</th>
-                      <th className="px-4 py-3 w-[12%] min-w-[90px] text-right">Actions</th>
+                      <th className="px-4 py-3 w-20">Sl.No</th>
+                      <th className="px-4 py-3 w-28">Preview</th>
+                      <th className="px-4 py-3">Photo File</th>
+                      <th className="px-4 py-3 w-40 text-center">Status</th>
+                      <th className="px-4 py-3 w-28 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F0ECE3]">
@@ -616,21 +616,23 @@ export default function GalleryPage() {
                       const status = item.gallery_status || item.status || 'Active';
                       const isActive = status === 'Active';
                       const rowNumber = (currentPage - 1) * perPage + index + 1;
+
                       return (
                         <tr key={item.id || index} className="hover:bg-[#FAF8F5] transition-colors">
-                          <td className="px-4 py-3 font-mono text-xs text-[#9C9488]">{rowNumber}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-[#9C9488] align-middle">{rowNumber}</td>
                           
                           {/* Image Preview */}
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 align-middle">
                             <div
                               onClick={() => handleOpenPreview(item)}
-                              className="h-10 w-16 rounded-lg bg-[#F7F4EE] border border-[#E8E3DA] overflow-hidden cursor-pointer hover:border-[#C99C4B] transition flex items-center justify-center group"
+                              className="h-11 w-18 rounded-lg bg-[#FAF8F5] border border-[#E8E3DA] p-0.5 overflow-hidden cursor-pointer hover:border-[#C99C4B] transition flex items-center justify-center group shadow-2xs"
+                              title="Click to preview"
                             >
                               {imageUrl ? (
                                 <img
                                   src={imageUrl}
                                   alt={`#${item.id}`}
-                                  className="h-full w-full object-cover group-hover:scale-110 transition-transform"
+                                  className="h-full w-full object-cover rounded-md group-hover:scale-105 transition-transform"
                                   onError={(e) => {
                                     e.currentTarget.src = noImageUrl || '';
                                   }}
@@ -641,20 +643,35 @@ export default function GalleryPage() {
                             </div>
                           </td>
 
-                          {/* Photo Details */}
-                          <td className="px-4 py-3">
-                            <span className="font-mono text-xs font-semibold text-[#1A1817]">
-                              {item.gallery_image || `Photo #${item.id}`}
-                            </span>
+                          {/* Copy Link Button */}
+                          <td className="px-4 py-3 align-middle">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyLink(imageUrl, item.id)}
+                              title="Copy Image URL"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] hover:bg-[#F2EFEB] text-[#4A443D] hover:text-[#1A1817] text-xs font-medium transition cursor-pointer shadow-2xs"
+                            >
+                              {copiedId === item.id ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-semibold text-xs">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3.5 w-3.5 text-[#9E7432]" />
+                                  <span className="text-xs">Copy Link</span>
+                                </>
+                              )}
+                            </button>
                           </td>
 
-                          {/* Status Pill Toggle */}
-                          <td className="px-4 py-3">
+                          {/* Status Pill Toggle (Centered) */}
+                          <td className="px-4 py-3 align-middle text-center">
                             <button
                               type="button"
                               onClick={() => handleToggleStatus(item)}
                               title="Click to toggle status"
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all cursor-pointer ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer ${
                                 isActive
                                   ? 'bg-[#EDF7EE] text-[#1E6B34] border-[#C6E6CC] hover:bg-[#DFF0E1]'
                                   : 'bg-[#FDF0F0] text-[#9A2D2D] border-[#F6C8C8] hover:bg-[#FBE4E4]'
@@ -667,27 +684,16 @@ export default function GalleryPage() {
                             </button>
                           </td>
 
-                          {/* Action Buttons (View & Edit only) */}
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenPreview(item)}
-                                title="View Full Photo"
-                                className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditModal(item)}
-                                title="Edit Photo"
-                                className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
-                              >
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+                          {/* Action Button (Edit - Right aligned) */}
+                          <td className="px-4 py-3 align-middle text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(item)}
+                              title="Edit Photo"
+                              className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] hover:text-[#9E7432] transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
+                            >
+                              <Edit2 className="h-3.5 w-3.5 text-[#9E7432]" />
+                            </button>
                           </td>
                         </tr>
                       );
@@ -714,15 +720,18 @@ export default function GalleryPage() {
         </main>
       </div>
 
-      {/* Add / Edit Gallery Modal */}
+      {/* Upload / Edit Gallery Photos Modal */}
       <GalleryModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingItem(null);
+        }}
         onSubmit={handleFormSubmit}
         form={form}
         setForm={setForm}
-        editingId={editingId}
         submitting={submitting}
+        isEditing={Boolean(editingItem)}
       />
 
       {/* Lightbox / Preview Modal */}
@@ -731,7 +740,6 @@ export default function GalleryPage() {
         onClose={() => setPreviewModalOpen(false)}
         item={previewItem}
         imageUrl={previewItem ? resolveImageUrl(previewItem.gallery_image || previewItem.image || previewItem.photo || previewItem.gallery || previewItem.file_name || previewItem.gallery_photo || previewItem.image_name) : ''}
-        onEdit={(it) => handleOpenEditModal(it)}
       />
     </div>
   );

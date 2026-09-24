@@ -3,22 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import Pagination from '../components/common/Pagination';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import { 
   getBlogs, 
   updateBlogStatus 
 } from '../services/blogApi';
+import { getCategories } from '../services/categoryApi';
+import { getAssetBaseURL } from '../services/api';
+import { useApp } from '../context/AppContext';
 import { 
   Plus, 
   Search, 
   Edit2, 
-  Eye,
   RefreshCw, 
   FileText, 
   Image as ImageIcon,
-  Star,
-  Home,
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
@@ -34,33 +33,41 @@ function extractList(response) {
   return [];
 }
 
-function slugify(text) {
-  return String(text || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return String(dateStr);
-  return d.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+function formatDate(dateVal) {
+  if (!dateVal || dateVal === '—' || dateVal === 'null') return '—';
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return String(dateVal);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch {
+    return String(dateVal);
+  }
 }
 
 export default function BlogPage() {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
+  const [categoriesMap, setCategoriesMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [imageBaseUrl, setImageBaseUrl] = useState('https://agsdemo.in/ckapi/public/assets/images/blog_images/');
+  const [apiBlogBaseUrl, setImageBaseUrl] = useState(null);
+  const { imageUrlConfig } = useApp();
+  const imageBaseUrl = useMemo(() => {
+    if (apiBlogBaseUrl) return apiBlogBaseUrl;
+    const found = (imageUrlConfig || []).find(
+      (i) =>
+        i?.image_for?.toLowerCase() === 'blog' ||
+        i?.image_for?.toLowerCase() === 'blogs' ||
+        i?.image_for?.toLowerCase() === 'blog_image' ||
+        i?.image_for?.toLowerCase() === 'blog_images'
+    );
+    const fallbackBase = getAssetBaseURL('/assets/images/blog_images/');
+    return found?.image_url || fallbackBase;
+  }, [apiBlogBaseUrl, imageUrlConfig]);
 
   const debouncedSearch = useDebounce(searchQuery, 350);
 
@@ -71,6 +78,26 @@ export default function BlogPage() {
   const [perPage, setPerPage] = useState(10);
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
+
+  // Load category names lookup
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await getCategories({ per_page: 100 });
+        const list = res?.data?.data || res?.data || res?.categories || res || [];
+        if (Array.isArray(list)) {
+          const map = {};
+          list.forEach((c) => {
+            if (c.id) map[c.id] = c.category_name || c.name || c.categories;
+          });
+          setCategoriesMap(map);
+        }
+      } catch {
+        // ignore error
+      }
+    };
+    loadCategories();
+  }, []);
 
   /* ── 1. GET /blog with pagination ── */
   const fetchBlogs = async (page = currentPage, query = debouncedSearch, status = statusFilter) => {
@@ -243,16 +270,6 @@ export default function BlogPage() {
             </div>
           </div>
 
-          {/* Stats Summary Cards */}
-          <StatsSummaryBar
-            stats={blogStats}
-            activeFilter={statusFilter}
-            onSelectFilter={(filter) => {
-              setStatusFilter(filter);
-              setCurrentPage(1);
-            }}
-          />
-
           {/* Search & Filter Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
@@ -290,14 +307,17 @@ export default function BlogPage() {
               <>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs text-[#3D372E]">
-                    <thead className="bg-[#F7F4EE] border-b border-[#E8E3DA] text-xs uppercase font-semibold text-[#78716C] tracking-wider">
+                    <thead className="bg-[#F7F4EE] border-b border-[#E8E3DA] text-xs uppercase font-semibold text-[#78716C] tracking-wider whitespace-nowrap">
                       <tr>
-                        <th className="px-4 py-2.5 w-14">#</th>
-                        <th className="px-4 py-2.5">Article</th>
-                        <th className="px-4 py-2.5">Slug</th>
-                        <th className="px-4 py-2.5">Badges</th>
-                        <th className="px-4 py-2.5">Date</th>
-                        <th className="px-4 py-2.5">Status</th>
+                        <th className="px-4 py-2.5 w-16">Sl.No</th>
+                        <th className="px-4 py-2.5">banner_image</th>
+                        <th className="px-4 py-2.5">title</th>
+                        <th className="px-4 py-2.5">categories</th>
+                        <th className="px-4 py-2.5">created</th>
+                        <th className="px-4 py-2.5">front</th>
+                        <th className="px-4 py-2.5">featured</th>
+                        <th className="px-4 py-2.5">updated</th>
+                        <th className="px-4 py-2.5">status</th>
                         <th className="px-4 py-2.5 text-right">Actions</th>
                       </tr>
                     </thead>
@@ -305,107 +325,99 @@ export default function BlogPage() {
                       {items.map((item, index) => {
                         const id = item.id;
                         const title = item.blog_title || item.blog_meta_title || item.title || item.name || 'Untitled Article';
-                        const rawSlug = item.blog_slug || item.slug || item.url_slug || item.article_slug || item.url || '';
-                        const slug = rawSlug && rawSlug !== '—' ? rawSlug : slugify(title);
-                        const rawImg = item.blog_banner_image || item.banner_image || item.image || item.banner_image_url;
+                        const rawImg = item.blog_banner_image || item.banner_image || item.image || item.blog_image || item.banner_image_url || item.photo || item.file_name;
                         const cleanBase = imageBaseUrl.endsWith('/') ? imageBaseUrl : `${imageBaseUrl}/`;
+                        const timeStamp = item.updated_at ? new Date(item.updated_at).getTime() : (item.created_at ? new Date(item.created_at).getTime() : index);
                         const image = rawImg
                           ? (rawImg.startsWith('data:') || rawImg.startsWith('blob:')
                               ? rawImg
                               : rawImg.startsWith('http')
-                                ? `${rawImg}${rawImg.includes('?') ? '&' : '?'}t=${item.updated_at ? new Date(item.updated_at).getTime() : index}`
-                                : `${cleanBase}${rawImg.startsWith('/') ? rawImg.slice(1) : rawImg}?t=${item.updated_at ? new Date(item.updated_at).getTime() : index}`)
+                                ? `${rawImg}${rawImg.includes('?') ? '&' : '?'}t=${timeStamp}`
+                                : `${cleanBase}${rawImg.startsWith('/') ? rawImg.slice(1) : rawImg}?t=${timeStamp}`)
                           : null;
+                        
+                        const catId = item.blog_categories_ids || item.category_id || item.categories_id;
+                        const categoryName = item.category_name || item.category || item.categories || (catId && categoriesMap[catId]) || (catId ? `Category #${catId}` : '—');
+                        
+                        const createdDate = item.blog_created_date || item.created_at || item.created_date;
+                        const updatedDate = item.blog_updated_date || item.updated_at || item.updated_date;
+                        
+                        const isFront = String(item.blog_front ?? item.front ?? item.is_home ?? '0') === '1' || item.blog_front === 'Active' || item.blog_front === true || item.front === 'Active' || item.front === true || String(item.blog_front).toLowerCase() === 'yes';
+                        const isFeatured = String(item.blog_featured ?? item.featured ?? item.is_featured ?? '0') === '1' || item.blog_featured === 'Active' || item.blog_featured === true || item.featured === 'Active' || item.featured === true || String(item.blog_featured).toLowerCase() === 'yes';
+                        
                         const status = item.blog_status || item.status || 'Active';
-                        const isFeatured = String(item.blog_featured) === '1' || item.blog_featured === 'Active' || item.blog_featured === true || String(item.featured) === '1';
-                        const isFront = String(item.blog_front) === '1' || item.blog_front === 'Active' || item.blog_front === true || String(item.front) === '1' || String(item.is_home) === '1';
                         const isActive = status === 'Active';
-                        const date = 
-                          item.blog_created_date ||
-                          item.blog_updated_date ||
-                          item.created_at ||
-                          item.createdAt ||
-                          item.created_date ||
-                          item.createdDate ||
-                          item.date ||
-                          item.blog_date ||
-                          item.publish_date ||
-                          item.published_at ||
-                          item.publishedAt ||
-                          item.post_date ||
-                          item.added_on ||
-                          item.updated_at ||
-                          item.updatedAt;
-                        const formattedDate = formatDate(date) || formatDate(new Date());
                         const rowNumber = (currentPage - 1) * perPage + index + 1;
 
                         return (
                           <tr key={id || index} className="hover:bg-[#FAF8F5] transition-colors">
+                            {/* 1. sl.no */}
                             <td className="px-4 py-3 font-mono text-xs text-[#9C9488]">{rowNumber}</td>
                             
-                            {/* Article Details & Image Thumbnail */}
+                            {/* 2. banner_image */}
                             <td className="px-4 py-3">
-                              <div className="flex items-center gap-2.5">
-                                {image ? (
-                                  <img
-                                    src={image}
-                                    alt={title}
-                                    className="h-8 w-12 rounded-lg object-cover border border-[#E8E3DA] flex-shrink-0"
-                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                  />
-                                ) : (
-                                  <div className="h-8 w-12 rounded-lg bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center flex-shrink-0">
-                                    <ImageIcon className="h-4 w-4" />
-                                  </div>
-                                )}
-                                <div className="min-w-0 max-w-xs">
-                                  <button
-                                    onClick={() => navigate(`/blog/view/${id}`)}
-                                    className="text-xs font-medium text-[#1A1817] hover:text-[#C99C4B] transition text-left block truncate cursor-pointer"
-                                  >
-                                    {title}
-                                  </button>
-                                  {(item.blog_short_description || item.short_description) && (
-                                    <span className="text-[11px] text-[#8C8275] block truncate mt-0.5">
-                                      {item.blog_short_description || item.short_description}
-                                    </span>
-                                  )}
+                              {image ? (
+                                <img
+                                  src={image}
+                                  alt={title}
+                                  className="h-9 w-14 rounded-lg object-cover border border-[#E8E3DA] flex-shrink-0"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <div className="h-9 w-14 rounded-lg bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] flex items-center justify-center flex-shrink-0">
+                                  <ImageIcon className="h-4 w-4" />
                                 </div>
-                              </div>
+                              )}
                             </td>
 
-                            {/* Slug */}
-                            <td className="px-4 py-3 font-mono text-xs text-[#78716C] max-w-[150px] truncate">
-                              /{slug}
+                            {/* 3. title */}
+                            <td className="px-4 py-3 font-medium text-xs text-[#1A1817] max-w-[200px]">
+                              <span className="block truncate" title={title}>
+                                {title}
+                              </span>
                             </td>
 
-                            {/* Visibility Badges */}
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-1">
-                                {isFeatured && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-medium" title="Featured Article">
-                                    <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
-                                    <span>Featured</span>
-                                  </span>
-                                )}
-                                {isFront && (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 text-[10px] font-medium" title="Shown on Homepage">
-                                    <Home className="h-2.5 w-2.5 text-indigo-600" />
-                                    <span>Home</span>
-                                  </span>
-                                )}
-                                {!isFeatured && !isFront && (
-                                  <span className="text-xs text-[#9C9488]">Standard</span>
-                                )}
-                              </div>
+                            {/* 4. categories */}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#FAF8F5] border border-[#E8E3DA] text-[11px] text-[#4A443D]">
+                                {categoryName}
+                              </span>
                             </td>
 
-                            <td className="px-4 py-3 text-xs text-[#78716C] whitespace-nowrap">
-                              {formattedDate}
+                            {/* 5. created_date */}
+                            <td className="px-4 py-3 whitespace-nowrap text-xs text-[#78716C]">
+                              {formatDate(createdDate)}
                             </td>
 
-                            {/* Status Pill & Quick Toggle */}
-                            <td className="px-4 py-3">
+                            {/* 6. front */}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                                isFront
+                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                  : 'bg-[#F7F4EE] text-[#8C8275] border-[#E8E3DA]'
+                              }`}>
+                                {isFront ? 'Yes' : 'No'}
+                              </span>
+                            </td>
+
+                            {/* 7. featured */}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                                isFeatured
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : 'bg-[#F7F4EE] text-[#8C8275] border-[#E8E3DA]'
+                              }`}>
+                                {isFeatured ? 'Yes' : 'No'}
+                              </span>
+                            </td>
+
+                            {/* 8. updated_date */}
+                            <td className="px-4 py-3 whitespace-nowrap text-xs text-[#78716C]">
+                              {formatDate(updatedDate)}
+                            </td>
+
+                            {/* 9. status */}
+                            <td className="px-4 py-3 whitespace-nowrap">
                               <button
                                 onClick={() => handleToggleStatus(id, status)}
                                 title={`Click to mark ${isActive ? 'Inactive' : 'Active'}`}
@@ -420,24 +432,15 @@ export default function BlogPage() {
                               </button>
                             </td>
 
-                            {/* Actions */}
+                            {/* Actions (Edit only) */}
                             <td className="px-4 py-3 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  onClick={() => navigate(`/blog/view/${id}`)}
-                                  title="View Article Overview"
-                                  className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
-                                >
-                                  <Eye className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => navigate(`/blog/edit/${id}`)}
-                                  title="Edit Article"
-                                  className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
-                                >
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
+                              <button
+                                onClick={() => navigate(`/blog/edit/${id}`)}
+                                title="Edit Article"
+                                className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
                             </td>
                           </tr>
                         );

@@ -2,12 +2,17 @@ import axios from 'axios';
 
 const TOKEN_KEY = 'emwa_crm_token';
 
-const getBaseURL = () => {
+export const getBaseURL = () => {
   const envBaseURL =
-    import.meta.env.VITE_API_BASE_URL ||
-    'https://agsdemo.in/ckapi/public/api';
+    import.meta.env.VITE_API_BASE_URL;
 
   return envBaseURL.replace(/\/$/, '');
+};
+
+export const getAssetBaseURL = (subPath = '') => {
+  const base = getBaseURL().replace(/\/api\/?$/, '');
+  const cleanSubPath = subPath ? (subPath.startsWith('/') ? subPath : `/${subPath}`) : '';
+  return `${base}${cleanSubPath}`;
 };
 
 export const api = axios.create({

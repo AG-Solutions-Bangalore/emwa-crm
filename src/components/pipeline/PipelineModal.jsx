@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Workflow, Plus, Trash2, Save, AlertCircle, Clock, LayoutTemplate, Layers } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { deletePipelineSub } from '../../services/pipelineApi';
-import { getTemplates } from '../../services/templateApi';
+import { getActiveTemplates, getTemplates } from '../../services/templateApi';
 
 const emptySubStep = (index = 1) => ({
   pipeline_sub_name: `Step ${index} - Automated Message`,
@@ -59,12 +59,18 @@ export default function PipelineModal({
       // Fetch templates for dropdown selection (filter WhatsApp only)
       (async () => {
         try {
-          const res = await getTemplates({ per_page: 100 });
-          const list = extractList(res);
+          let list = [];
+          try {
+            const res = await getActiveTemplates('WhatsApp');
+            list = extractList(res);
+          } catch {
+            const res = await getTemplates({ per_page: 100 });
+            list = extractList(res);
+          }
           const whatsappOnly = list.filter(
-            (tpl) => String(tpl.template_type || '').trim().toLowerCase() === 'whatsapp'
+            (tpl) => String(tpl.template_type || tpl.type || '').trim().toLowerCase() === 'whatsapp'
           );
-          setAvailableTemplates(whatsappOnly);
+          setAvailableTemplates(whatsappOnly.length > 0 ? whatsappOnly : list);
         } catch (err) {
           // Fallback
         }
@@ -302,32 +308,24 @@ export default function PipelineModal({
                       {/* Template Selector */}
                       <div>
                         <label className="block text-xs font-semibold text-[#3D372E] mb-1">
-                          Campaign Template ID
+                          WhatsApp Template <span className="text-[#9A2D2D]">*</span>
                         </label>
-                        {availableTemplates.length > 0 ? (
-                          <div className="space-y-1">
-                            <select
-                              value={sub.pipeline_sub_template_id || ''}
-                              onChange={(e) => handleSubChange(index, 'pipeline_sub_template_id', e.target.value)}
-                              className="w-full px-3 py-2 text-xs rounded-lg border border-[#E2DDD5] bg-white text-[#1A1817] focus:outline-none focus:border-[#C99C4B] transition shadow-2xs cursor-pointer"
-                            >
-                              <option value="">-- Select a Template --</option>
-                              {availableTemplates.map((tpl) => (
-                                <option key={tpl.id} value={tpl.template_id || tpl.template_name || tpl.id}>
-                                  [{tpl.template_type}] {tpl.template_name} ({tpl.template_id || tpl.id})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : (
-                          <input
-                            type="text"
-                            value={sub.pipeline_sub_template_id || ''}
-                            onChange={(e) => handleSubChange(index, 'pipeline_sub_template_id', e.target.value)}
-                            placeholder="e.g. welcome_email_v1"
-                            className="w-full px-3 py-2 text-xs rounded-lg border border-[#E2DDD5] bg-white text-[#1A1817] focus:outline-none focus:border-[#C99C4B] transition shadow-2xs font-mono"
-                          />
-                        )}
+                        <select
+                          value={sub.pipeline_sub_template_id || ''}
+                          onChange={(e) => handleSubChange(index, 'pipeline_sub_template_id', e.target.value)}
+                          required
+                          className="w-full px-3 py-2 text-xs rounded-lg border border-[#E2DDD5] bg-white text-[#1A1817] focus:outline-none focus:border-[#C99C4B] transition shadow-2xs cursor-pointer"
+                        >
+                          <option value="">-- Select WhatsApp Template --</option>
+                          {availableTemplates.map((tpl) => {
+                            const templateName = tpl.template_name || tpl.name || tpl.template_id || String(tpl.id);
+                            return (
+                              <option key={tpl.id || templateName} value={templateName}>
+                                {templateName}
+                              </option>
+                            );
+                          })}
+                        </select>
                       </div>
 
                       {/* Trigger Timing / Delay (Integer Days) */}

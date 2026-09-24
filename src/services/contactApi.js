@@ -1,4 +1,4 @@
-import api from './api';
+import api, { getAssetBaseURL } from './api';
 
 /**
  * Helper to normalize group_ids to array of numbers/strings
@@ -159,7 +159,7 @@ export const deleteContact = async (id) => {
   }
 };
 
-export const CONTACT_TEMPLATE_URL = 'https://agsdemo.in/ckapi/public/assets/import/contact_formate.xlsx';
+export const CONTACT_TEMPLATE_URL = getAssetBaseURL('/assets/import/contact_formate.xlsx');
 
 export default {
   getContacts,
