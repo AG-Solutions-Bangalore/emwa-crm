@@ -160,11 +160,17 @@ export default function ContactViewModal({
               <Calendar className="h-3.5 w-3.5" />
               <span>
                 Created on{' '}
-                {new Date(createdDate).toLocaleDateString('en-IN', {
-                  day: '2-digit',
-                  month: 'short',
-                  year: 'numeric',
-                })}
+                {(() => {
+                  try {
+                    const d = new Date(createdDate);
+                    if (isNaN(d.getTime())) return String(createdDate);
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    return `${day}/${month}/${d.getFullYear()}`;
+                  } catch {
+                    return String(createdDate);
+                  }
+                })()}
               </span>
             </div>
           )}

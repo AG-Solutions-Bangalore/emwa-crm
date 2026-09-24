@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Building2, Edit2, Calendar, CheckCircle2, XCircle, ExternalLink } from 'lucide-react';
+import { X, Building2, Edit2, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function ClientViewModal({
   isOpen,
@@ -13,7 +13,6 @@ export default function ClientViewModal({
   const name = item.clients_name || item.client_name || item.name || 'Client Partner';
   const status = item.clients_status || item.status || 'Active';
   const isActive = status === 'Active';
-  const createdDate = item.created_at || item.createdDate || item.date;
 
   return (
     <div
@@ -27,9 +26,6 @@ export default function ClientViewModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E3DA] bg-[#FAF8F5] rounded-t-2xl flex-shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="font-mono text-xs font-semibold text-[#8C8275]">
-              #{item.id}
-            </span>
             <span
               className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
                 isActive
@@ -70,19 +66,6 @@ export default function ClientViewModal({
             <h3 className="font-display text-lg font-bold text-[#1A1817] tracking-tight">
               {name}
             </h3>
-            {createdDate && (
-              <p className="text-[11px] text-[#8C8275] mt-1 flex items-center justify-center gap-1">
-                <Calendar className="h-3 w-3" />
-                <span>
-                  Added on{' '}
-                  {new Date(createdDate).toLocaleDateString('en-IN', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                  })}
-                </span>
-              </p>
-            )}
           </div>
         </div>
 

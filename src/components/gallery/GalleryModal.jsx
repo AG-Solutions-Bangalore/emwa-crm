@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Image as ImageIcon, Upload, Save, AlertCircle, RefreshCw, Plus, Trash2 } from 'lucide-react';
+import { X, Image as ImageIcon, Upload, Save, AlertCircle, Plus, Trash2, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 export default function GalleryModal({
   isOpen,
@@ -7,65 +7,49 @@ export default function GalleryModal({
   onSubmit,
   form,
   setForm,
-  editingId,
   submitting,
+  isEditing = false,
 }) {
   const fileInputRef = useRef(null);
   const [dragActive, setDragActive] = useState(false);
   const [selectedPreviews, setSelectedPreviews] = useState([]);
-  const [singlePreviewUrl, setSinglePreviewUrl] = useState(null);
   const [fileError, setFileError] = useState('');
 
   // Synchronize previews when modal opens or form changes
   useEffect(() => {
     if (isOpen) {
       setFileError('');
-      if (editingId) {
-        // Edit mode (single image)
-        if (form.gallery_image instanceof File) {
-          const objectUrl = URL.createObjectURL(form.gallery_image);
-          setSinglePreviewUrl(objectUrl);
-          return () => URL.revokeObjectURL(objectUrl);
-        } else if (form.existing_image_url) {
-          setSinglePreviewUrl(form.existing_image_url);
-        } else {
-          setSinglePreviewUrl(null);
-        }
-      } else {
-        // Multi-image upload mode
-        if (Array.isArray(form.gallery_images) && form.gallery_images.length > 0) {
-          const previews = form.gallery_images.map((file) => ({
-            file,
-            id: `${file.name}-${file.lastModified}-${Math.random()}`,
-            url: URL.createObjectURL(file),
-            name: file.name,
-            size: (file.size / 1024).toFixed(0),
-          }));
-          setSelectedPreviews(previews);
+      if (Array.isArray(form.gallery_images) && form.gallery_images.length > 0) {
+        const previews = form.gallery_images.map((file) => ({
+          file,
+          id: `${file.name}-${file.lastModified}-${Math.random()}`,
+          url: URL.createObjectURL(file),
+          name: file.name,
+          size: (file.size / 1024).toFixed(0),
+        }));
+        setSelectedPreviews(previews);
 
-          return () => {
-            previews.forEach((p) => URL.revokeObjectURL(p.url));
-          };
-        } else if (form.gallery_image instanceof File) {
-          const singleObj = {
-            file: form.gallery_image,
-            id: `${form.gallery_image.name}-${form.gallery_image.lastModified}`,
-            url: URL.createObjectURL(form.gallery_image),
-            name: form.gallery_image.name,
-            size: (form.gallery_image.size / 1024).toFixed(0),
-          };
-          setSelectedPreviews([singleObj]);
-          return () => URL.revokeObjectURL(singleObj.url);
-        } else {
-          setSelectedPreviews([]);
-        }
+        return () => {
+          previews.forEach((p) => URL.revokeObjectURL(p.url));
+        };
+      } else if (form.gallery_image instanceof File) {
+        const singleObj = {
+          file: form.gallery_image,
+          id: `${form.gallery_image.name}-${form.gallery_image.lastModified}`,
+          url: URL.createObjectURL(form.gallery_image),
+          name: form.gallery_image.name,
+          size: (form.gallery_image.size / 1024).toFixed(0),
+        };
+        setSelectedPreviews([singleObj]);
+        return () => URL.revokeObjectURL(singleObj.url);
+      } else {
+        setSelectedPreviews([]);
       }
     } else {
       setSelectedPreviews([]);
-      setSinglePreviewUrl(null);
       setFileError('');
     }
-  }, [isOpen, editingId, form.gallery_image, form.gallery_images, form.existing_image_url]);
+  }, [isOpen, form.gallery_image, form.gallery_images]);
 
   if (!isOpen) return null;
 
@@ -99,24 +83,15 @@ export default function GalleryModal({
 
     if (validFiles.length === 0) return;
 
-    if (editingId) {
-      // Single replacement in edit mode
-      setForm((prev) => ({
+    setForm((prev) => {
+      const currentList = Array.isArray(prev.gallery_images) ? prev.gallery_images : [];
+      const merged = isEditing ? [validFiles[0]] : [...currentList, ...validFiles];
+      return {
         ...prev,
-        gallery_image: validFiles[0],
-      }));
-    } else {
-      // Append in multi-upload mode
-      setForm((prev) => {
-        const currentList = Array.isArray(prev.gallery_images) ? prev.gallery_images : [];
-        const merged = [...currentList, ...validFiles];
-        return {
-          ...prev,
-          gallery_images: merged,
-          gallery_image: merged[0] || null,
-        };
-      });
-    }
+        gallery_images: merged,
+        gallery_image: merged[0] || null,
+      };
+    });
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -140,10 +115,8 @@ export default function GalleryModal({
       ...prev,
       gallery_images: [],
       gallery_image: null,
-      existing_image_url: null,
     }));
     setSelectedPreviews([]);
-    setSinglePreviewUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -168,14 +141,9 @@ export default function GalleryModal({
     }
   };
 
-  const handleStatusChange = (e) => {
-    const { value } = e.target;
-    setForm((prev) => ({ ...prev, gallery_status: value }));
-  };
-
   const handleFormSubmit = (e) => {
     e.preventDefault();
-    if (!editingId) {
+    if (!isEditing) {
       const count = Array.isArray(form.gallery_images) ? form.gallery_images.length : form.gallery_image ? 1 : 0;
       if (count === 0) {
         setFileError('Please select at least one WEBP image to upload.');
@@ -185,9 +153,7 @@ export default function GalleryModal({
     onSubmit(e);
   };
 
-  const totalSelectedCount = editingId
-    ? form.gallery_image || form.existing_image_url ? 1 : 0
-    : Array.isArray(form.gallery_images) ? form.gallery_images.length : (form.gallery_image ? 1 : 0);
+  const totalSelectedCount = Array.isArray(form.gallery_images) ? form.gallery_images.length : (form.gallery_image ? 1 : 0);
 
   return (
     <div
@@ -206,10 +172,10 @@ export default function GalleryModal({
             </div>
             <div>
               <h3 className="font-display text-base sm:text-lg font-bold text-[#1A1817] tracking-tight">
-                {editingId ? 'Edit Gallery Photo' : 'Upload Gallery Photos'}
+                {isEditing ? 'Edit Gallery Photo' : 'Upload Gallery Photos'}
               </h3>
               <p className="text-xs text-[#78716C]">
-                {editingId ? 'Update photo file or change display status' : 'Select and upload multiple high-resolution WEBP photos'}
+                {isEditing ? 'View photo details or replace with a new WEBP image' : 'Select and upload high-resolution WEBP photos'}
               </p>
             </div>
           </div>
@@ -232,56 +198,129 @@ export default function GalleryModal({
             ref={fileInputRef}
             type="file"
             accept="image/webp,.webp"
-            multiple={!editingId}
+            multiple={!isEditing}
             className="hidden"
             onChange={(e) => validateAndAddFiles(e.target.files)}
           />
 
-          {/* EDIT MODE (Single Image Preview) */}
-          {editingId ? (
-            <div>
-              <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                Gallery Image
-              </label>
-
-              {singlePreviewUrl ? (
-                <div className="relative rounded-xl border border-[#E2DDD5] bg-[#F7F4EE] p-3 overflow-hidden group">
-                  <div className="flex items-center justify-center max-h-56 overflow-hidden rounded-lg bg-black/5">
+          {/* EDIT MODE: Show Existing Photo + Replacement Option */}
+          {isEditing && (
+            <div className="space-y-4">
+              
+              {/* Existing Photo Display */}
+              <div>
+                <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
+                  Current Gallery Photo
+                </label>
+                <div className="p-3 rounded-xl border border-[#E8E3DA] bg-white flex flex-col sm:flex-row items-center gap-4 shadow-2xs">
+                  {form.existingImage ? (
                     <img
-                      src={singlePreviewUrl}
-                      alt="Gallery Preview"
-                      className="max-h-52 w-auto object-contain rounded-lg shadow-2xs"
+                      src={form.existingImage}
+                      alt="Current Gallery Item"
+                      className="h-28 w-36 object-cover rounded-lg border border-[#E8E3DA] flex-shrink-0 shadow-2xs"
                     />
-                  </div>
+                  ) : (
+                    <div className="h-28 w-36 rounded-lg bg-[#FAF8F5] border border-dashed border-[#DDD7CD] flex items-center justify-center text-[#9C9488]">
+                      <ImageIcon className="h-8 w-8" />
+                    </div>
+                  )}
 
-                  <div className="mt-3 flex items-center justify-between text-xs">
-                    <span className="text-[#78716C] truncate max-w-[240px]">
-                      {form.gallery_image instanceof File ? form.gallery_image.name : 'Current Image'}
-                    </span>
-                    
+                  <div className="flex-1 min-w-0 text-xs space-y-2">
+                    <div>
+                      <span className="text-[11px] text-[#8C8275] block">File Name / Identifier</span>
+                      <p className="font-semibold text-[#1A1817] truncate">{form.fileName || 'Gallery Image'}</p>
+                    </div>
+
+                    <div>
+                      <span className="text-[11px] text-[#8C8275] block mb-1">Status</span>
+                      <select
+                        value={form.gallery_status || 'Active'}
+                        onChange={(e) => setForm((prev) => ({ ...prev, gallery_status: e.target.value }))}
+                        className="px-3 py-1.5 text-xs rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] transition cursor-pointer font-medium"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Replacement Section */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-[#3D372E]">
+                    Replace Photo
+                  </label>
+                  {selectedPreviews.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAll}
+                      className="text-xs text-[#9A2D2D] hover:underline cursor-pointer font-medium"
+                    >
+                      Cancel Replacement • Keep Original
+                    </button>
+                  )}
+                </div>
+
+                {selectedPreviews.length > 0 ? (
+                  <div className="p-3 rounded-xl border-2 border-emerald-200 bg-emerald-50/40 flex items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={selectedPreviews[0].url}
+                        alt="New replacement preview"
+                        className="h-16 w-20 object-cover rounded-lg border border-emerald-300 shadow-2xs flex-shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full mb-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          New Replacement Selected
+                        </span>
+                        <p className="text-xs font-medium text-[#1A1817] truncate">{selectedPreviews[0].name}</p>
+                        <p className="text-[10px] text-[#78716C]">{selectedPreviews[0].size} KB</p>
+                      </div>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-xs font-medium text-[#4A443D] transition cursor-pointer shadow-2xs"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#F2EFEB] text-xs font-medium text-[#3D372E] transition cursor-pointer shadow-2xs flex-shrink-0"
                     >
-                      <RefreshCw className="h-3 w-3" />
-                      Replace WEBP Photo
+                      <RefreshCw className="h-3.5 w-3.5 text-[#8C6527]" />
+                      <span>Change</span>
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all border-[#DDD7CD] bg-[#FAF8F5] hover:border-[#C99C4B] hover:bg-[#F7F4EE]"
-                >
-                  <Upload className="h-6 w-6 text-[#9E7432] mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-[#1A1817]">Select Replacement WEBP Photo</p>
-                  <p className="text-[11px] text-[#8C8275] mt-1">Supports WEBP only (Max 10MB)</p>
-                </div>
-              )}
+                ) : (
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
+                      dragActive
+                        ? 'border-[#C99C4B] bg-[#FBF7EE]'
+                        : 'border-[#DDD7CD] bg-[#FAF8F5] hover:border-[#C99C4B] hover:bg-[#F7F4EE]'
+                    }`}
+                  >
+                    <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-[#F5EFE3] text-[#9E7432] mb-1.5 shadow-2xs">
+                      <Upload className="h-4 w-4" />
+                    </div>
+                    <p className="text-xs font-semibold text-[#1A1817]">
+                      Click to browse or drag and drop replacement WEBP photo
+                    </p>
+                    <p className="text-[10px] text-[#8C8275] mt-0.5">
+                      Leave empty to keep the existing photo and just update details
+                    </p>
+                  </div>
+                )}
+              </div>
+
             </div>
-          ) : (
-            /* CREATE MODE (Multiple Image Upload & Preview Grid) */
+          )}
+
+          {/* CREATE MODE: Upload Photos */}
+          {!isEditing && (
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-[#3D372E]">
@@ -383,22 +422,6 @@ export default function GalleryModal({
             </div>
           )}
 
-          {/* Status selector */}
-          <div>
-            <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-              Publication Status
-            </label>
-            <select
-              name="gallery_status"
-              value={form.gallery_status || 'Active'}
-              onChange={handleStatusChange}
-              className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs cursor-pointer"
-            >
-              <option value="Active">Active (Visible in Gallery)</option>
-              <option value="Inactive">Inactive (Hidden)</option>
-            </select>
-          </div>
-
           </div>
 
           {/* Sticky Footer */}
@@ -419,8 +442,8 @@ export default function GalleryModal({
               <Save className="h-3.5 w-3.5 text-[#C99C4B]" />
               <span>
                 {submitting
-                  ? 'Uploading...'
-                  : editingId
+                  ? (isEditing ? 'Updating...' : 'Uploading...')
+                  : isEditing
                   ? 'Update Photo'
                   : totalSelectedCount > 1
                   ? `Upload ${totalSelectedCount} Photos`

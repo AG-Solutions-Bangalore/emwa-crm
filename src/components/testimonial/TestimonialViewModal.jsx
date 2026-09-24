@@ -15,7 +15,7 @@ export default function TestimonialViewModal({
   const description = item.testimonial_description || item.description || item.comment || '';
   const status = item.testimonial_status || item.status || 'Active';
   const isActive = status === 'Active';
-  const createdDate = item.created_at || item.createdDate || item.date;
+  const createdDate = item.testimonial_created_date || item.created_at || item.createdDate || item.date;
 
   return (
     <div
@@ -101,11 +101,18 @@ export default function TestimonialViewModal({
               <Calendar className="h-3.5 w-3.5" />
               <span>
                 Submitted on{' '}
-                {new Date(createdDate).toLocaleDateString('en-IN', {
-                  day: '2-digit',
-                  month: 'short',
-                  year: 'numeric',
-                })}
+                {(() => {
+                  try {
+                    const d = new Date(createdDate);
+                    if (isNaN(d.getTime())) return String(createdDate);
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const year = d.getFullYear();
+                    return `${day}-${month}-${year}`;
+                  } catch {
+                    return String(createdDate);
+                  }
+                })()}
               </span>
             </div>
           )}

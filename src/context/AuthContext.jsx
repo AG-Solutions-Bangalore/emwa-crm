@@ -222,10 +222,21 @@ export function AuthProvider({ children }) {
   const hasEmail = user?.isEmail !== undefined ? String(user.isEmail).trim().toLowerCase() === 'yes' : true;
   const hasWhatsApp = user?.isWhatsApp !== undefined ? String(user.isWhatsApp).trim().toLowerCase() === 'yes' : true;
 
+  // Role-based permissions based on user_type (1: User, 2: Admin)
+  const rawUserType = user?.user_type;
+  const userType = rawUserType !== undefined && rawUserType !== null ? Number(rawUserType) : 2;
+  const isAdmin = userType === 2;
+  const isUser = userType === 1;
+  const canDelete = isAdmin; // Standard user (user_type === 1) has no delete option anywhere
+
   const value = useMemo(
     () => ({
       token,
       user,
+      userType,
+      isAdmin,
+      isUser,
+      canDelete,
       isEmail: hasEmail ? 'Yes' : 'No',
       isWhatsApp: hasWhatsApp ? 'Yes' : 'No',
       hasEmail,
@@ -248,7 +259,7 @@ export function AuthProvider({ children }) {
         }
       },
     }),
-    [token, user, dotenvConfig, hasEmail, hasWhatsApp]
+    [token, user, userType, isAdmin, isUser, canDelete, dotenvConfig, hasEmail, hasWhatsApp]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

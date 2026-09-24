@@ -3,7 +3,6 @@ import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import CategoryModal from '../components/category/CategoryModal';
 import Pagination from '../components/common/Pagination';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import { 
   getCategories, 
@@ -277,25 +276,15 @@ export default function CategoryPage() {
                 <span>Refresh</span>
               </button>
 
-              <button
+              {/* <button
                 onClick={handleOpenCreate}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
                 <span>Add Category</span>
-              </button>
+              </button> */}
             </div>
           </div>
-
-          {/* Unique Stats Summary Cards */}
-          <StatsSummaryBar
-            stats={categoryStats}
-            activeFilter={statusFilter}
-            onSelectFilter={(filter) => {
-              setStatusFilter(filter);
-              setCurrentPage(1);
-            }}
-          />
 
           {/* Search & Filter Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -336,7 +325,7 @@ export default function CategoryPage() {
                   <table className="w-full text-left text-xs text-[#3D372E]">
                     <thead className="bg-[#F7F4EE] border-b border-[#E8E3DA] text-xs uppercase font-semibold text-[#78716C] tracking-wider">
                       <tr>
-                        <th className="px-4 py-2.5 w-14">#</th>
+                        <th className="px-4 py-2.5 w-16">Sl.No</th>
                         <th className="px-4 py-2.5">Category Name</th>
                         <th className="px-4 py-2.5">Status</th>
                         <th className="px-4 py-2.5 text-right">Actions</th>

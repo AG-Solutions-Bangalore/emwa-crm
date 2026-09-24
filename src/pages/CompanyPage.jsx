@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import { useAppContext } from '../context/AppContext';
 import { getCompanyDetails, updateCompanyDetails } from '../services/companyApi';
 import {
@@ -198,9 +197,6 @@ export default function CompanyPage() {
             </div>
           </div>
 
-          {/* Stats Summary Bar */}
-          <StatsSummaryBar stats={companyStats} />
-
           {/* Company Profile Main Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             
@@ -336,7 +332,12 @@ export default function CompanyPage() {
               </div>
 
               <div className="pt-4 mt-4 border-t border-[#F0ECE3] flex items-center justify-between text-xs text-[#8C8275]">
-                <span>Last Synchronized: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                <span>Last Synchronized: {(() => {
+                  const d = new Date();
+                  const day = String(d.getDate()).padStart(2, '0');
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  return `${day}/${month}/${d.getFullYear()}`;
+                })()}</span>
                 <span className="font-mono text-[11px] text-[#9E7432]">API Connected</span>
               </div>
             </div>

@@ -4,7 +4,6 @@ import Header from '../components/layout/Header';
 import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 import EnquiryDetailsModal from '../components/enquiry/EnquiryDetailsModal';
 import Pagination from '../components/common/Pagination';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import { getEnquiries, getEnquiryById, updateEnquiryStatus, deleteEnquiry } from '../services/enquiryApi';
 import { useAuthContext } from '../context/AuthContext';
@@ -32,19 +31,22 @@ function extractList(response) {
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return String(dateStr);
-  return d.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch {
+    return String(dateStr);
+  }
 }
 
 const STATUS_OPTIONS = ['Pending', 'Processing', 'Completed', 'Cancel'];
 
 export default function EnquiryPage() {
-  const { hasEmail, hasWhatsApp } = useAuthContext();
+  const { hasEmail, hasWhatsApp, isAdmin } = useAuthContext();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -266,16 +268,6 @@ export default function EnquiryPage() {
             </div>
           </div>
 
-          {/* Unique Stats Summary Cards */}
-          <StatsSummaryBar
-            stats={enquiryStats}
-            activeFilter={statusFilter}
-            onSelectFilter={(filter) => {
-              setStatusFilter(filter);
-              setCurrentPage(1);
-            }}
-          />
-
           {/* Search and Status Filters Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col md:flex-row items-center justify-between gap-3">
             
@@ -313,13 +305,16 @@ export default function EnquiryPage() {
               <>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs text-[#3D372E]">
-                    <thead className="bg-[#F7F4EE] border-b border-[#E8E3DA] text-xs uppercase font-semibold text-[#78716C] tracking-wider">
+                    <thead className="bg-[#F7F4EE] border-b border-[#E8E3DA] text-xs uppercase font-semibold text-[#78716C] tracking-wider whitespace-nowrap">
                       <tr>
-                        <th className="px-4 py-2.5 w-14">#</th>
-                        <th className="px-4 py-2.5">Customer</th>
-                        {hasWhatsApp && <th className="px-4 py-2.5">Contact</th>}
-                        <th className="px-4 py-2.5">Occasion</th>
-                        <th className="px-4 py-2.5">Date</th>
+                        <th className="px-4 py-2.5 w-14">Sl.No</th>
+                        <th className="px-4 py-2.5">FullName</th>
+                        <th className="px-4 py-2.5">Mobile</th>
+                        <th className="px-4 py-2.5">Email</th>
+                        <th className="px-4 py-2.5">Service</th>
+                        <th className="px-4 py-2.5">Enquiry From</th>
+                        <th className="px-4 py-2.5">Message</th>
+                        <th className="px-4 py-2.5">UTM Tracking</th>
                         <th className="px-4 py-2.5">Status</th>
                         <th className="px-4 py-2.5 text-right">Actions</th>
                       </tr>
@@ -327,75 +322,130 @@ export default function EnquiryPage() {
                     <tbody className="divide-y divide-[#F0ECE3]">
                       {items.map((item, index) => {
                         const id = item.id;
-                        const name = item.enquiryFullName || item.full_name || item.name || 'N/A';
-                        const mobile = item.enquiryMobile || item.mobile || 'N/A';
-                        const email = item.enquiryEmail || item.email || '';
-                        const occasion = item.occasion || item.enquiryOccasion || '—';
+                        const fullName = item.enquiryFullName || item.full_name || item.fullName || item.name || '—';
+                        const mobile = item.enquiryMobile || item.mobile || item.phone || '—';
+                        const email = item.enquiryEmail || item.email || '—';
+                        const service = item.enquiryService || item.service || item.service_name || '—';
+                        const enquiryFrom = item.enquiryFrom || item.enquiry_from || '—';
+                        const message = item.enquiryMessage || item.message || item.description || '—';
+                        const utmMedium = item.utm_medium || '';
+                        const utmSource = item.utm_source || '';
+                        const utmCampaign = item.utm_campaign || '';
+                        const hasUtm = Boolean(utmSource || utmMedium || utmCampaign);
                         const currentStatus = item.enquiryStatus || item.enquiry_status || item.status || 'Pending';
-                        const date = item.created_at || item.createdDate || item.enquiryCreatedDate;
                         const rowNumber = (currentPage - 1) * perPage + index + 1;
 
                         return (
                           <tr key={id || index} className="hover:bg-[#FAF8F5] transition-colors">
+                            {/* 1. sl.no */}
                             <td className="px-4 py-3 font-mono text-xs text-[#9C9488]">{rowNumber}</td>
                             
-                            <td className="px-4 py-3">
-                              <div className="font-medium text-[#1A1817] tracking-tight">{name}</div>
-                              {hasEmail && email && <div className="text-[11px] text-[#8C8275] mt-0.5">{email}</div>}
+                            {/* 2. FullName */}
+                            <td className="px-4 py-3 font-medium text-xs text-[#1A1817] whitespace-nowrap">
+                              {fullName}
                             </td>
 
-                            {hasWhatsApp && (
-                              <td className="px-4 py-3 font-medium text-[#3D372E]">
-                                {mobile}
-                              </td>
-                            )}
+                            {/* 3. Mobile */}
+                            <td className="px-4 py-3 text-xs text-[#3D372E] whitespace-nowrap font-mono">
+                              {mobile}
+                            </td>
 
-                            <td className="px-4 py-3">
-                              <span className="px-2.5 py-0.5 rounded-full bg-[#FAF8F5] border border-[#E8E3DA] text-[#4A443D] font-medium text-[11px]">
-                                {occasion}
+                            {/* 4. Email */}
+                            <td className="px-4 py-3 text-xs text-[#5C554B] whitespace-nowrap">
+                              {email}
+                            </td>
+
+                            {/* 5. Service */}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-[#FAF8F5] border border-[#E8E3DA] text-[11px] text-[#4A443D] font-medium">
+                                {service}
                               </span>
                             </td>
 
-                            <td className="px-4 py-3 text-xs text-[#78716C] whitespace-nowrap">
-                              {formatDate(date)}
+                            {/* 6. Enquiry From */}
+                            <td className="px-4 py-3 text-xs text-[#6B655B] max-w-[200px]">
+                              <span className="block truncate" title={enquiryFrom}>
+                                {enquiryFrom}
+                              </span>
                             </td>
 
-                            {/* Status Dropdown */}
-                            <td className="px-4 py-3">
-                              <select
-                                value={currentStatus}
-                                onChange={(e) => handleStatusChange(id, e.target.value)}
-                                className={`text-xs font-medium py-0.5 px-2.5 rounded-full border outline-none cursor-pointer transition shadow-2xs ${getStatusColor(currentStatus)}`}
-                              >
-                                {STATUS_OPTIONS.map((opt) => (
-                                  <option key={opt} value={opt} className="bg-white text-[#1A1817]">
-                                    {opt}
-                                  </option>
-                                ))}
-                              </select>
+                            {/* 7. Message */}
+                            <td className="px-4 py-3 text-xs text-[#78716C] max-w-[200px]">
+                              <span className="block truncate" title={message}>
+                                {message}
+                              </span>
                             </td>
 
-                            {/* Actions */}
+                            {/* 8. UTM Tracking */}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {hasUtm ? (
+                                <div className="flex flex-wrap gap-1 max-w-[180px]">
+                                  {utmSource && (
+                                    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#EBF3FF] text-[#1E40AF] border border-[#BFDBFE]">
+                                      s:{utmSource}
+                                    </span>
+                                  )}
+                                  {utmMedium && (
+                                    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#F3E8FF] text-[#6B21A8] border border-[#E9D5FF]">
+                                      m:{utmMedium}
+                                    </span>
+                                  )}
+                                  {utmCampaign && (
+                                    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#ECFDF5] text-[#065F46] border border-[#A7F3D0]">
+                                      c:{utmCampaign}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[#A8A29E] text-[11px]">—</span>
+                              )}
+                            </td>
+
+                            {/* 9. Status */}
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {isAdmin ? (
+                                <select
+                                  value={currentStatus}
+                                  onChange={(e) => handleStatusChange(id, e.target.value)}
+                                  className={`text-xs font-medium py-0.5 px-2.5 rounded-full border outline-none cursor-pointer transition shadow-2xs ${getStatusColor(currentStatus)}`}
+                                >
+                                  {STATUS_OPTIONS.map((opt) => (
+                                    <option key={opt} value={opt} className="bg-white text-[#1A1817]">
+                                      {opt}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <span className={`inline-flex items-center text-xs font-medium py-0.5 px-2.5 rounded-full border shadow-2xs ${getStatusColor(currentStatus)}`}>
+                                  {currentStatus}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* 10. Actions */}
                             <td className="px-4 py-3 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1">
                                 <button
+                                  type="button"
                                   onClick={() => handleViewDetails(id)}
-                                  title="View Details"
-                                  className="p-1.5 rounded-lg text-[#78716C] hover:text-[#1A1817] hover:bg-[#EFECE6] transition cursor-pointer"
+                                  title="View Enquiry Details"
+                                  className="p-1.5 rounded-lg text-[#78716C] hover:text-[#9E7432] hover:bg-[#FBF4E8] transition cursor-pointer"
                                 >
                                   <Eye className="h-3.5 w-3.5" />
                                 </button>
-
-                                <button
-                                  onClick={() => {
-                                    setDeletingId(id);
-                                    setDeleteModalOpen(true);
-                                  }}
-                                  title="Delete Enquiry"
-                                  className="p-1.5 rounded-lg text-[#78716C] hover:text-[#9A2D2D] hover:bg-[#FDF0F0] transition cursor-pointer"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDeletingId(id);
+                                      setDeleteModalOpen(true);
+                                    }}
+                                    title="Delete Enquiry"
+                                    className="p-1.5 rounded-lg text-[#78716C] hover:text-[#9A2D2D] hover:bg-[#FDF0F0] transition cursor-pointer"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

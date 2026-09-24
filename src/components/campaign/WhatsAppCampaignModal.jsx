@@ -285,7 +285,7 @@ export default function WhatsAppCampaignModal({
                   onChange={handleInputChange}
                   className="accent-[#1A1817]"
                 />
-                <span>Yes (Recommended — Pause on Holidays)</span>
+                <span>Yes</span>
               </label>
 
               <label className="inline-flex items-center gap-2 text-xs font-medium text-[#1A1817] cursor-pointer">
@@ -297,7 +297,7 @@ export default function WhatsAppCampaignModal({
                   onChange={handleInputChange}
                   className="accent-[#1A1817]"
                 />
-                <span>No (Send Regardless)</span>
+                <span>No</span>
               </label>
             </div>
           </div>
@@ -314,9 +314,9 @@ export default function WhatsAppCampaignModal({
                 onChange={handleInputChange}
                 className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs cursor-pointer"
               >
-                <option value="Pending">Pending (Scheduled)</option>
-                <option value="Sent">Sent (Completed)</option>
-                <option value="Hold">Hold (Paused)</option>
+                <option value="Pending">Pending</option>
+                <option value="Sent">Sent</option>
+                <option value="Hold">Hold</option>
               </select>
             </div>
           )}

@@ -249,8 +249,8 @@ export default function ClientModal({
                   onChange={(e) => setForm((prev) => ({ ...prev, clients_status: e.target.value }))}
                   className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs cursor-pointer"
                 >
-                  <option value="Active">Active (Visible)</option>
-                  <option value="Inactive">Inactive (Hidden)</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
                 </select>
               </div>
             )}

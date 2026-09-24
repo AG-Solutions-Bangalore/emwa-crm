@@ -13,18 +13,23 @@ function buildGalleryFormData(payload, isUpdate = false) {
 
   const formData = new FormData();
 
-  if (payload?.gallery_image) {
-    if (payload.gallery_image instanceof File || payload.gallery_image instanceof Blob) {
-      formData.append('gallery_image', payload.gallery_image);
-      formData.append('image', payload.gallery_image);
-    }
-  }
-
-  if (payload?.gallery_status) {
-    formData.append('gallery_status', String(payload.gallery_status).trim());
+  const file = payload?.gallery_image || payload?.image || payload?.photo || payload?.file || (Array.isArray(payload?.gallery_images) && payload.gallery_images.length > 0 ? payload.gallery_images[0] : null);
+  if (file instanceof File || file instanceof Blob) {
+    formData.append('gallery_image', file);
+    formData.append('image', file);
+    formData.append('gallery_images', file);
+    formData.append('gallery_photo', file);
+    formData.append('photo', file);
+    formData.append('file', file);
+    formData.append('gallery', file);
   }
 
   if (isUpdate) {
+    const status = payload?.gallery_status || payload?.status;
+    if (status) {
+      formData.append('gallery_status', String(status).trim());
+      formData.append('status', String(status).trim());
+    }
     formData.append('_method', 'PUT');
   }
 
@@ -75,11 +80,23 @@ export const updateGallery = async (id, payload) => {
     });
     return response.data;
   } catch (err) {
-    // Fallback direct PUT request
-    const response = await api.put(`/gallery/${id}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
+    // Fallback 1: direct PUT request
+    try {
+      const response = await api.put(`/gallery/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (putErr) {
+      // Fallback 2: POST /gallerys/{id}
+      try {
+        const response = await api.post(`/gallerys/${id}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
+      } catch (postErr) {
+        throw err;
+      }
+    }
   }
 };
 
