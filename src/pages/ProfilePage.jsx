@@ -230,13 +230,17 @@ export default function ProfilePage() {
                       )}
                       <div>
                         <h3 className="font-serif text-sm font-semibold text-[#1A1817]">{companyInfo.company_name}</h3>
-                        <p className="text-[10px] text-[#8C8275]">{companyInfo.company_place || 'Bangalore'}</p>
+                        {companyInfo.company_place && (
+                          <p className="text-[10px] text-[#8C8275]">{companyInfo.company_place}</p>
+                        )}
                       </div>
                     </div>
-                    <div className="pt-1 text-[11px] text-[#4A443D]">
-                      <span className="text-[10px] text-[#9C9488] font-bold block uppercase tracking-wider mb-0.5">Office Location</span>
-                      {companyInfo.company_address}
-                    </div>
+                    {companyInfo.company_address && (
+                      <div className="pt-1 text-[11px] text-[#4A443D]">
+                        <span className="text-[10px] text-[#9C9488] font-bold block uppercase tracking-wider mb-0.5">Office Location</span>
+                        {companyInfo.company_address}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

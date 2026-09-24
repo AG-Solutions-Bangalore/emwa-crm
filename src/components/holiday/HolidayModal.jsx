@@ -97,7 +97,7 @@ export default function HolidayModal({
             {/* Optional Holiday Name / Description */}
             <div>
               <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                Holiday Name / Reason (Optional)
+                Holiday Name / Reason
               </label>
               <input
                 type="text"

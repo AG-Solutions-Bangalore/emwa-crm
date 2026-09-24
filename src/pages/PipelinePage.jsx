@@ -1,16 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
-import PipelineModal from '../components/pipeline/PipelineModal';
 import PipelineViewModal from '../components/pipeline/PipelineViewModal';
 import Pagination from '../components/common/Pagination';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import {
   getPipelines,
   getPipelineById,
-  createPipeline,
-  updatePipeline,
   updatePipelineStatus,
 } from '../services/pipelineApi';
 import {
@@ -54,6 +51,8 @@ const initialForm = {
 };
 
 export default function PipelinePage() {
+  const navigate = useNavigate();
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,12 +67,6 @@ export default function PipelinePage() {
   const [perPage, setPerPage] = useState(10);
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
-
-  // Modal State (Create / Edit)
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState(initialForm);
 
   // Preview Modal State
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -155,80 +148,7 @@ export default function PipelinePage() {
     }
   };
 
-  /* ── 2. CREATE (POST /pipeline) & UPDATE (PUT /pipeline/{id}) ── */
-  const handleOpenCreateModal = () => {
-    setEditingId(null);
-    setForm(initialForm);
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEditModal = async (item) => {
-    setEditingId(item.id);
-    setIsModalOpen(true);
-
-    const mapSubs = (rawList) =>
-      (rawList || []).map((s, idx) => ({
-        id: s.id || s.pipeline_sub_id,
-        pipeline_sub_id: s.id || s.pipeline_sub_id,
-        pipeline_sub_name: s.pipeline_sub_name || s.name || `Step ${idx + 1} - Automated Message`,
-        pipeline_sub_template_id: s.pipeline_sub_template_id || s.template_id || '',
-        pipeline_sub_time: s.pipeline_sub_time !== undefined && s.pipeline_sub_time !== null ? s.pipeline_sub_time : 0,
-        pipeline_sub_status: s.pipeline_sub_status || s.status || s.pipeline_status || 'Active',
-      }));
-
-    const initialSubs = mapSubs(item.subs || item.sub || item.stages || item.steps || item.pipeline_subs || item.pipeline_sub || []);
-
-    setForm({
-      pipeline_name: item.pipeline_name || item.name || '',
-      pipeline_status: item.pipeline_status || item.status || 'Active',
-      subs: initialSubs.length > 0 ? initialSubs : initialForm.subs,
-    });
-
-    try {
-      const res = await getPipelineById(item.id);
-      const freshData = res?.data?.pipeline || res?.data?.data || res?.data || res?.pipeline || res;
-      if (freshData) {
-        const rawList = freshData.subs || freshData.sub || freshData.stages || freshData.steps || freshData.pipeline_subs || freshData.pipeline_sub || [];
-        const freshSubs = mapSubs(rawList);
-
-        setForm({
-          pipeline_name: freshData.pipeline_name || item.pipeline_name || '',
-          pipeline_status: freshData.pipeline_status || item.pipeline_status || 'Active',
-          subs: freshSubs.length > 0 ? freshSubs : (initialSubs.length > 0 ? initialSubs : initialForm.subs),
-        });
-      }
-    } catch (err) {
-      // Use existing values
-    }
-  };
-
-  const handleFormSubmit = async (e) => {
-    e?.preventDefault();
-    setSubmitting(true);
-
-    try {
-      if (editingId) {
-        // PUT /pipeline/{id}
-        await updatePipeline(editingId, form);
-        toast.success('Pipeline updated successfully.');
-      } else {
-        // POST /pipeline
-        await createPipeline(form);
-        toast.success('Pipeline created successfully.');
-      }
-
-      setIsModalOpen(false);
-      setForm(initialForm);
-      fetchPipelineList(currentPage, searchQuery, statusFilter);
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to save pipeline.';
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  /* ── 3. PATCH /pipelines/{id}/status ── */
+  /* ── 2. PATCH /pipelines/{id}/status ── */
   const handleToggleStatus = async (item) => {
     const id = item.id;
     const currentStatus = item.pipeline_status || item.status || 'Active';
@@ -342,7 +262,7 @@ export default function PipelinePage() {
               </button>
 
               <button
-                onClick={handleOpenCreateModal}
+                onClick={() => navigate('/pipeline/create')}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
@@ -350,16 +270,6 @@ export default function PipelinePage() {
               </button>
             </div>
           </div>
-
-          {/* Unique Stats Summary Cards */}
-          <StatsSummaryBar
-            stats={pipelineStats}
-            activeFilter={statusFilter}
-            onSelectFilter={(filter) => {
-              setStatusFilter(filter);
-              setCurrentPage(1);
-            }}
-          />
 
           {/* Search & Filter Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -394,7 +304,7 @@ export default function PipelinePage() {
                   : 'Automate your customer follow-ups by creating your first multi-stage pipeline.'}
               </p>
               <button
-                onClick={handleOpenCreateModal}
+                onClick={() => navigate('/pipeline/create')}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1A1817] text-[#FAF8F5] text-xs font-semibold shadow-xs hover:bg-[#2C2825] transition cursor-pointer"
               >
                 <Plus className="h-4 w-4 text-[#C99C4B]" />
@@ -463,7 +373,7 @@ export default function PipelinePage() {
 
                           <button
                             type="button"
-                            onClick={() => handleOpenEditModal(item)}
+                            onClick={() => navigate(`/pipeline/edit/${item.id}`)}
                             title="Edit Pipeline"
                             className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
                           >
@@ -527,23 +437,12 @@ export default function PipelinePage() {
         </main>
       </div>
 
-      {/* Add / Edit Pipeline Modal */}
-      <PipelineModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleFormSubmit}
-        form={form}
-        setForm={setForm}
-        editingId={editingId}
-        submitting={submitting}
-      />
-
       {/* View Pipeline Modal */}
       <PipelineViewModal
         isOpen={previewModalOpen}
         onClose={() => setPreviewModalOpen(false)}
         item={previewItem}
-        onEdit={(it) => handleOpenEditModal(it)}
+        onEdit={(it) => navigate(`/pipeline/edit/${it.id}`)}
       />
     </div>
   );

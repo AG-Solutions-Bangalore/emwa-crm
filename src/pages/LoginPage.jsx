@@ -16,11 +16,94 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const handleMobileChange = (e) => {
+    const rawValue = e.target.value;
+
+    if (/\D/.test(rawValue)) {
+      toast.error('Only numbers are allowed in mobile number.', { id: 'mobile-chars' });
+    }
+
+    const digitsOnly = rawValue.replace(/\D/g, '');
+    if (digitsOnly.length > 10) {
+      toast.error('Mobile number cannot exceed 10 digits.', { id: 'mobile-max' });
+    }
+
+    const numericValue = digitsOnly.slice(0, 10);
+    setUsername(numericValue);
+    if (error) setError('');
+    if (fieldErrors.username) {
+      setFieldErrors((prev) => ({ ...prev, username: '' }));
+    }
+  };
+
+  const handleMobileKeyDown = (e) => {
+    if (
+      e.key.length === 1 &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey &&
+      !/^\d$/.test(e.key)
+    ) {
+      toast.error('Only numbers are allowed in mobile number.', { id: 'mobile-chars' });
+    } else if (
+      e.key.length === 1 &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      /^\d$/.test(e.key) &&
+      username.length >= 10 &&
+      window.getSelection()?.toString() === ''
+    ) {
+      toast.error('Mobile number cannot exceed 10 digits.', { id: 'mobile-max' });
+    }
+  };
+
+  const handleMobileBlur = () => {
+    if (username && username.length < 10) {
+      toast.error('Mobile number must be exactly 10 digits.', { id: 'mobile-min' });
+      setFieldErrors((prev) => ({ ...prev, username: 'Mobile number must be exactly 10 digits.' }));
+    }
+  };
+
+  const handlePasswordChange = (e) => {
+    setPassword(e.target.value);
+    if (error) setError('');
+    if (fieldErrors.password) {
+      setFieldErrors((prev) => ({ ...prev, password: '' }));
+    }
+  };
+
+  const validate = () => {
+    const errors = {};
+    const cleanPhone = username.trim();
+
+    if (!cleanPhone) {
+      errors.username = 'Please enter mobile number.';
+      toast.error('Please enter mobile number.', { id: 'login-phone-req' });
+    } else if (cleanPhone.length !== 10) {
+      errors.username = 'Mobile number must be exactly 10 digits.';
+      toast.error('Mobile number must be exactly 10 digits.', { id: 'login-phone-len' });
+    }
+
+    if (!password.trim()) {
+      errors.password = 'Please enter password.';
+      if (cleanPhone && cleanPhone.length === 10) {
+        toast.error('Please enter password.', { id: 'login-pwd-req' });
+      }
+    }
+
+    setFieldErrors(errors);
+    return errors;
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!username.trim() || !password.trim()) {
-      setError('Please enter both username and password.');
+    const errors = validate();
+
+    if (Object.keys(errors).length > 0) {
+      const firstError = errors.username || errors.password;
+      setError(firstError);
       return;
     }
 
@@ -63,10 +146,10 @@ export default function LoginPage() {
             />
           </div>
           <h1 className="font-display text-2xl font-bold text-[#1A1817] tracking-tight">
-            {companyInfo?.company_name || 'AG Solutions'}
+            {companyInfo?.company_name || 'Admin Portal'}
           </h1>
           <p className="text-xs text-[#78716C] mt-1">
-            EMWA CRM <span className="text-[#C99C4B] mx-1">•</span> Admin Access Portal
+            {companyInfo?.company_short ? `${companyInfo.company_short} • ` : ''}Admin Access Portal
           </p>
         </div>
 
@@ -77,20 +160,29 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} noValidate className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">Mobile Number</label>
             <div className="relative flex items-center">
               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9C9488] pointer-events-none" />
               <input
-                type="text"
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={10}
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter mobile number..."
-                className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs"
-                required
+                onChange={handleMobileChange}
+                onKeyDown={handleMobileKeyDown}
+                onBlur={handleMobileBlur}
+                placeholder="Enter 10-digit mobile number"
+                className={`w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border ${
+                  fieldErrors.username ? 'border-[#E05252] bg-[#FFF8F8]' : 'border-[#E2DDD5] bg-[#FAF8F5]'
+                } text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs`}
               />
             </div>
+            {fieldErrors.username && (
+              <p className="text-[11px] text-[#E05252] mt-1 pl-1 font-medium">{fieldErrors.username}</p>
+            )}
           </div>
 
           <div>
@@ -108,19 +200,24 @@ export default function LoginPage() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={handlePasswordChange}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-10 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs"
-                required
+                className={`w-full pl-10 pr-10 py-2.5 text-sm rounded-xl border ${
+                  fieldErrors.password ? 'border-[#E05252] bg-[#FFF8F8]' : 'border-[#E2DDD5] bg-[#FAF8F5]'
+                } text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9C9488] hover:text-[#1A1817] p-1 cursor-pointer"
+                tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {fieldErrors.password && (
+              <p className="text-[11px] text-[#E05252] mt-1 pl-1 font-medium">{fieldErrors.password}</p>
+            )}
           </div>
 
           <button

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { checkPanelStatus } from '../services/api';
+import { checkPanelStatus, getAssetBaseURL } from '../services/api';
 import { encryptData, decryptData, encryptId, decryptId, secureStorage } from '../utils/crypto';
 
 const AppContext = createContext(null);
@@ -88,7 +88,8 @@ export function AppProvider({ children }) {
     const companyImgObj = (imageUrlConfig || []).find(
       (i) => i.image_for?.toLowerCase() === 'company'
     );
-    const baseUrl = companyImgObj?.image_url || 'https://easemarketing.in/emwaapi/public/assets/images/company_images/';
+    const fallbackBase = getAssetBaseURL('/assets/images/company_images/');
+    const baseUrl = companyImgObj?.image_url || fallbackBase;
     if (
       companyInfo.company_logo.startsWith('http://') ||
       companyInfo.company_logo.startsWith('https://') ||
@@ -109,6 +110,27 @@ export function AppProvider({ children }) {
     const noImgObj = (imageUrlConfig || []).find((i) => i.image_for?.toLowerCase() === 'no image');
     return noImgObj?.image_url || '/no_image.jpg';
   }, [imageUrlConfig]);
+
+  /** Dynamically sync document title and browser tab favicon from backend company data */
+  useEffect(() => {
+    if (companyInfo?.company_name) {
+      document.title = `${companyInfo.company_name} - Admin Portal`;
+    } else {
+      document.title = 'Admin Portal';
+    }
+
+    if (companyLogoUrl && companyLogoUrl !== '/no_image.jpg') {
+      let faviconEl = document.querySelector("link[rel*='icon']");
+      if (faviconEl) {
+        faviconEl.href = companyLogoUrl;
+      } else {
+        faviconEl = document.createElement('link');
+        faviconEl.rel = 'icon';
+        faviconEl.href = companyLogoUrl;
+        document.head.appendChild(faviconEl);
+      }
+    }
+  }, [companyInfo, companyLogoUrl]);
 
   const value = useMemo(
     () => ({

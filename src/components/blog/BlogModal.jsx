@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, Sparkles, Upload, FileText, ChevronRight, ChevronLeft } from 'lucide-react';
 import { getActiveCategories } from '../../services/categoryApi';
+import { getAssetBaseURL } from '../../services/api';
 import RichTextEditor from '../common/RichTextEditor';
 import toast from 'react-hot-toast';
 
@@ -13,7 +14,7 @@ function slugify(text) {
     .replace(/^-+|-+$/g, '');
 }
 
-function resolveImageUrl(url, baseUrl = 'https://easemarketing.in/emwaapi/public/assets/images/blog_images/') {
+function resolveImageUrl(url, baseUrl = getAssetBaseURL('/assets/images/blog_images/')) {
   if (!url) return null;
   if (url.startsWith('blob:') || url.startsWith('data:')) {
     return url;
@@ -36,7 +37,7 @@ export default function BlogModal({
   setForm,
   editingId,
   submitting,
-  imageBaseUrl = 'https://easemarketing.in/emwaapi/public/assets/images/blog_images/',
+  imageBaseUrl = getAssetBaseURL('/assets/images/blog_images/'),
 }) {
   const [categories, setCategories] = useState([]);
   const [activeTab, setActiveTab] = useState('general');
@@ -149,6 +150,14 @@ export default function BlogModal({
       setTimeout(() => {
         slugInputRef.current?.focus();
       }, 100);
+      return false;
+    }
+
+    const cleanDesc = (form.blog_description || '').replace(/<[^>]*>/g, '').trim();
+    if (!cleanDesc) {
+      setErrors((prev) => ({ ...prev, blog_description: true }));
+      setActiveTab('general');
+      toast.error('Full Article Body / Description is required.');
       return false;
     }
 
@@ -402,7 +411,7 @@ export default function BlogModal({
                         <Upload className="h-5 w-5" />
                       </div>
                       <p className="text-sm font-semibold text-[#1A1817]">Upload Banner Image</p>
-                      <p className="text-xs text-[#8C8275]">Supports PNG, JPG, WEBP (Max 5MB)</p>
+                      <p className="text-xs text-[#8C8275]">Supports PNG, JPG, WEBP • Max 5MB</p>
                     </div>
                   )}
                 </div>
@@ -429,7 +438,7 @@ export default function BlogModal({
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                  Meta Keywords (SEO)
+                  Meta Keywords
                 </label>
                 <input
                   type="text"
@@ -441,21 +450,23 @@ export default function BlogModal({
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                <div>
-                  <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                    Publication Status
-                  </label>
-                  <select
-                    name="blog_status"
-                    value={form.blog_status || 'Active'}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs cursor-pointer"
-                  >
-                    <option value="Active">Active (Published)</option>
-                    <option value="Inactive">Inactive (Draft/Hidden)</option>
-                  </select>
-                </div>
+              <div className={editingId ? 'grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1' : 'pt-1'}>
+                {editingId && (
+                  <div>
+                    <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
+                      Status
+                    </label>
+                    <select
+                      name="blog_status"
+                      value={form.blog_status || 'Active'}
+                      onChange={handleChange}
+                      className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs cursor-pointer"
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
@@ -467,8 +478,8 @@ export default function BlogModal({
                     onChange={handleChange}
                     className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs cursor-pointer"
                   >
-                    <option value="1">Index (Search visible)</option>
-                    <option value="0">No-Index (Hidden from Google)</option>
+                    <option value="1">Index</option>
+                    <option value="0">No-Index</option>
                   </select>
                 </div>
               </div>

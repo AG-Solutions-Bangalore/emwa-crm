@@ -3,6 +3,7 @@ import { X, HelpCircle, Plus, Trash2, Save, AlertCircle, GripVertical, ChevronDo
 import toast from 'react-hot-toast';
 import { deleteFaqSub } from '../../services/faqApi';
 import { getPageTwoList } from '../../services/pageTwoApi';
+import { useAuthContext } from '../../context/AuthContext';
 
 const emptySubItem = (index = 1, faq_for = '') => ({
   faq_sort: String(index),
@@ -22,6 +23,7 @@ export default function FaqModal({
   editingId,
   submitting,
 }) {
+  const { isAdmin } = useAuthContext();
   const [deletingSubId, setDeletingSubId] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [pages, setPages] = useState([]);
@@ -43,7 +45,9 @@ export default function FaqModal({
       setLoadingPages(true);
       try {
         const res = await getPageTwoList();
-        const rawList = Array.isArray(res?.data)
+        const rawList = Array.isArray(res?.data?.data)
+          ? res.data.data
+          : Array.isArray(res?.data)
           ? res.data
           : Array.isArray(res?.pages)
           ? res.pages
@@ -55,7 +59,7 @@ export default function FaqModal({
 
         const formatted = rawList
           .map((p) => {
-            const url = p.page_two_url || p.page_url || p.url || p.slug || '';
+            const url = p.page_two_url || p.page_url || p.url || p.slug || p.page || '';
             const name = p.page_two_name || p.page_name || p.name || p.title || p.page_two_url || url;
             return { url: String(url).trim(), name: String(name).trim() };
           })
@@ -115,40 +119,76 @@ export default function FaqModal({
     }));
   };
 
-  const handleRemoveSub = async (index) => {
-    const targetSub = form.subs[index];
-
-    // If existing sub has ID on server, delete on backend
-    if (targetSub?.id) {
-      if (form.subs.length <= 1) {
-        toast.error('A FAQ group must have at least one question.');
-        return;
-      }
-
-      if (!window.confirm('Are you sure you want to delete this question?')) {
-        return;
-      }
-
-      try {
-        setDeletingSubId(targetSub.id);
-        await deleteFaqSub(targetSub.id);
-        toast.success('Question deleted successfully.');
-      } catch (err) {
-        toast.error('Failed to delete question from server.');
-        setDeletingSubId(null);
-        return;
-      } finally {
-        setDeletingSubId(null);
-      }
+  const handleRemoveSub = (index) => {
+    if ((form.subs || []).length <= 1) {
+      toast.error('A FAQ group must have at least one question.');
+      return;
     }
 
-    setForm((prev) => {
-      const nextSubs = prev.subs.filter((_, i) => i !== index);
-      // Re-index sort order
-      return {
-        ...prev,
-        subs: nextSubs.length > 0 ? nextSubs.map((s, i) => ({ ...s, faq_sort: String(i + 1) })) : [emptySubItem(1, prev.faq_for || '')],
-      };
+    const targetSub = form.subs[index];
+    const questionLabel = targetSub.faq_que ? `"${targetSub.faq_que.slice(0, 35)}${targetSub.faq_que.length > 35 ? '...' : ''}"` : `Question #${index + 1}`;
+
+    toast((t) => (
+      <div className="flex flex-col gap-2 py-1 max-w-xs">
+        <p className="text-xs font-semibold text-[#1A1817]">
+          Do you really want to delete {questionLabel}?
+        </p>
+        <p className="text-[11px] text-[#78716C]">
+          {targetSub?.id
+            ? 'This will permanently remove the question from the server.'
+            : 'This will remove the unsaved question from this form.'}
+        </p>
+        <div className="flex items-center justify-end gap-2 mt-1">
+          <button
+            type="button"
+            onClick={() => toast.dismiss(t.id)}
+            className="px-2.5 py-1 text-xs rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#F2EFEB] text-[#4A443D] font-medium transition cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              toast.dismiss(t.id);
+              if (targetSub?.id) {
+                const toastId = toast.loading('Deleting question from server...');
+                try {
+                  setDeletingSubId(targetSub.id);
+                  const res = await deleteFaqSub(targetSub.id);
+                  toast.success(res?.message || 'Question deleted successfully.', { id: toastId });
+                  setForm((prev) => {
+                    const nextSubs = prev.subs.filter((_, i) => i !== index);
+                    return {
+                      ...prev,
+                      subs: nextSubs.map((s, i) => ({ ...s, faq_sort: String(i + 1) })),
+                    };
+                  });
+                } catch (err) {
+                  const msg = err?.response?.data?.message || err?.message || 'Failed to delete question from server.';
+                  toast.error(msg, { id: toastId });
+                } finally {
+                  setDeletingSubId(null);
+                }
+              } else {
+                setForm((prev) => {
+                  const nextSubs = prev.subs.filter((_, i) => i !== index);
+                  return {
+                    ...prev,
+                    subs: nextSubs.map((s, i) => ({ ...s, faq_sort: String(i + 1) })),
+                  };
+                });
+                toast.success('Question removed.');
+              }
+            }}
+            className="px-2.5 py-1 text-xs rounded-lg bg-[#9A2D2D] hover:bg-[#802424] text-white font-semibold transition cursor-pointer shadow-xs"
+          >
+            Yes, Delete
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 8000,
+      position: 'top-center',
     });
   };
 
@@ -237,7 +277,7 @@ export default function FaqModal({
                     </option>
                     {pages.map((p) => (
                       <option key={p.url} value={p.url}>
-                        {p.name} ({p.url})
+                        {p.name}
                       </option>
                     ))}
                   </select>
@@ -312,28 +352,41 @@ export default function FaqModal({
                           </select>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSub(index)}
-                          disabled={deletingSubId === sub.id}
-                          title="Remove Question"
-                          className="p-1 rounded-md text-[#8C8275] hover:text-[#9A2D2D] hover:bg-[#FDF0F0] transition cursor-pointer"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {isAdmin && (
+                          form.subs?.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSub(index)}
+                              disabled={deletingSubId === sub.id}
+                              title="Remove Question"
+                              className="p-1 rounded-md text-[#8C8275] hover:text-[#9A2D2D] hover:bg-[#FDF0F0] transition cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              title="At least 1 question is required"
+                              className="p-1 rounded-md text-[#CDC6BA] cursor-not-allowed opacity-40"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )
+                        )}
                       </div>
                     </div>
 
                     {/* Optional Section Heading */}
                     <div>
                       <label className="block text-[11px] font-medium text-[#78716C] mb-1">
-                        Optional Subsection Heading (faq_heading)
+                        Optional Subsection Heading
                       </label>
                       <input
                         type="text"
                         value={sub.faq_heading || ''}
                         onChange={(e) => handleSubChange(index, 'faq_heading', e.target.value)}
-                        placeholder="Enter subsection heading (optional)"
+                        placeholder="Enter subsection heading"
                         className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] transition"
                       />
                     </div>

@@ -1,16 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
-import FaqModal from '../components/faq/FaqModal';
 import FaqViewModal from '../components/faq/FaqViewModal';
 import Pagination from '../components/common/Pagination';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import {
   getFaqs,
   getFaqById,
-  createFaq,
-  updateFaq,
   updateFaqStatus,
 } from '../services/faqApi';
 import {
@@ -22,10 +19,6 @@ import {
   Eye,
   CheckCircle2,
   XCircle,
-  ChevronDown,
-  ChevronUp,
-  Layers,
-  MessageSquare,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -39,28 +32,14 @@ function extractList(response) {
   return [];
 }
 
-const initialForm = {
-  faq_for: '',
-  faq_status: 'Active',
-  subs: [
-    {
-      faq_sort: '1',
-      faq_for: '',
-      faq_heading: '',
-      faq_que: '',
-      faq_ans: '',
-      faq_status: 'Active',
-    },
-  ],
-};
-
 export default function FaqPage() {
+  const navigate = useNavigate();
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 350);
   const [statusFilter, setStatusFilter] = useState('All');
-  const [expandedCards, setExpandedCards] = useState({});
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -69,12 +48,6 @@ export default function FaqPage() {
   const [perPage, setPerPage] = useState(10);
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
-
-  // Modal State (Create / Edit)
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState(initialForm);
 
   // Preview Modal State
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -158,111 +131,7 @@ export default function FaqPage() {
     }
   };
 
-  const toggleCardExpand = async (id) => {
-    setExpandedCards((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-
-    // If item subs are empty, fetch details dynamically
-    const targetItem = items.find((it) => it.id === id);
-    const existingSubs = targetItem?.subs || targetItem?.sub || targetItem?.faq_subs || [];
-    if (existingSubs.length === 0) {
-      try {
-        const detailRes = await getFaqById(id);
-        const detailData = detailRes?.data || detailRes?.faq || detailRes || {};
-        const detailSubs = detailData.subs || detailData.sub || detailData.faq_subs || [];
-        if (detailSubs.length > 0) {
-          setItems((prev) =>
-            prev.map((it) => (it.id === id ? { ...it, ...detailData, subs: detailSubs } : it))
-          );
-        }
-      } catch (err) {
-        // ignore
-      }
-    }
-  };
-
-  /* ── 2. CREATE (POST /faq) & UPDATE (PUT /faq/{id}) ── */
-  const handleOpenCreateModal = () => {
-    setEditingId(null);
-    setForm(initialForm);
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEditModal = async (item) => {
-    setEditingId(item.id);
-    setIsModalOpen(true);
-
-    const initialSubs = (item.subs || item.sub || item.faq_subs || []).map((s, idx) => ({
-      id: s.id,
-      faq_sort: String(s.faq_sort ?? idx + 1),
-      faq_for: s.faq_for || item.faq_for || '',
-      faq_heading: s.faq_heading || '',
-      faq_que: s.faq_que || '',
-      faq_ans: s.faq_ans || '',
-      faq_status: (s.faq_status === 0 || s.faq_status === '0' || String(s.faq_status).toLowerCase() === 'inactive') ? 'Inactive' : 'Active',
-    }));
-
-    setForm({
-      faq_for: item.faq_for || '',
-      faq_status: item.faq_status || item.status || 'Active',
-      subs: initialSubs.length > 0 ? initialSubs : initialForm.subs,
-    });
-
-    // Optionally fetch fresh detail by ID (GET /faq/{id})
-    try {
-      const res = await getFaqById(item.id);
-      const freshData = res?.data || res?.faq || res;
-      if (freshData) {
-        const freshSubs = (freshData.subs || freshData.sub || freshData.faq_subs || []).map((s, idx) => ({
-          id: s.id,
-          faq_sort: String(s.faq_sort ?? idx + 1),
-          faq_for: s.faq_for || freshData.faq_for || '',
-          faq_heading: s.faq_heading || '',
-          faq_que: s.faq_que || '',
-          faq_ans: s.faq_ans || '',
-          faq_status: (s.faq_status === 0 || s.faq_status === '0' || String(s.faq_status).toLowerCase() === 'inactive') ? 'Inactive' : 'Active',
-        }));
-
-        setForm({
-          faq_for: freshData.faq_for || item.faq_for || '',
-          faq_status: freshData.faq_status || item.faq_status || 'Active',
-          subs: freshSubs.length > 0 ? freshSubs : initialSubs,
-        });
-      }
-    } catch (err) {
-      // Use existing item info
-    }
-  };
-
-  const handleFormSubmit = async (e) => {
-    e?.preventDefault();
-    setSubmitting(true);
-
-    try {
-      if (editingId) {
-        // PUT /faq/{id}
-        await updateFaq(editingId, form);
-        toast.success('FAQ group updated successfully.');
-      } else {
-        // POST /faq
-        await createFaq(form);
-        toast.success('FAQ group created successfully.');
-      }
-
-      setIsModalOpen(false);
-      setForm(initialForm);
-      fetchFaqList(currentPage, searchQuery, statusFilter);
-    } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to save FAQ.';
-      toast.error(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  /* ── 3. PATCH /faqs/{id}/status ── */
+  /* ── 2. PATCH /faqs/{id}/status ── */
   const handleToggleStatus = async (item) => {
     const id = item.id;
     const currentStatus = item.faq_status || item.status || 'Active';
@@ -387,7 +256,7 @@ export default function FaqPage() {
               </button>
 
               <button
-                onClick={handleOpenCreateModal}
+                onClick={() => navigate('/faq/create')}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-[11px] font-medium shadow-2xs transition-all active:scale-95 cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5 text-[#C99C4B]" />
@@ -395,16 +264,6 @@ export default function FaqPage() {
               </button>
             </div>
           </div>
-
-          {/* Unique Stats Summary Cards */}
-          <StatsSummaryBar
-            stats={faqStats}
-            activeFilter={statusFilter}
-            onSelectFilter={(filter) => {
-              setStatusFilter(filter);
-              setCurrentPage(1);
-            }}
-          />
 
           {/* Search & Filter Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -439,7 +298,7 @@ export default function FaqPage() {
                   : 'Start building your knowledge base by creating your first FAQ group with questions and answers.'}
               </p>
               <button
-                onClick={handleOpenCreateModal}
+                onClick={() => navigate('/faq/create')}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1A1817] text-[#FAF8F5] text-xs font-semibold shadow-xs hover:bg-[#2C2825] transition cursor-pointer"
               >
                 <Plus className="h-4 w-4 text-[#C99C4B]" />
@@ -454,7 +313,7 @@ export default function FaqPage() {
                 const status = item.faq_status || item.status || 'Active';
                 const isActive = status === 'Active';
                 const subs = item.subs || item.sub || item.faq_subs || [];
-                const isExpanded = !!expandedCards[id];
+                const rowNumber = (currentPage - 1) * perPage + index + 1;
 
                 return (
                   <div
@@ -462,11 +321,11 @@ export default function FaqPage() {
                     className="bg-white rounded-2xl border border-[#E8E3DA] overflow-hidden shadow-2xs hover:shadow-xs transition duration-200"
                   >
                     {/* Header Bar */}
-                    <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FCFBFA] border-b border-[#F0ECE3]">
+                    <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FCFBFA]">
                       
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] font-mono text-xs font-bold flex-shrink-0">
-                          #{id}
+                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#FBF4E8] text-[#9E7432] border border-[#F2E4C9] font-mono text-xs font-bold flex-shrink-0" title={`Sl.No ${rowNumber}`}>
+                          {rowNumber}
                         </span>
 
                         <div className="min-w-0">
@@ -478,9 +337,6 @@ export default function FaqPage() {
                               {subs.length} {subs.length === 1 ? 'Q&A' : 'Q&As'}
                             </span>
                           </div>
-                          <p className="text-[11px] text-[#8C8275] mt-0.5">
-                            Category / Section: <span className="font-mono text-[#5C554B]">{faqFor}</span>
-                          </p>
                         </div>
                       </div>
 
@@ -507,70 +363,16 @@ export default function FaqPage() {
                         <div className="inline-flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => handleOpenPreview(item)}
-                            title="Preview Questions"
-                            className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(item)}
+                            onClick={() => navigate(`/faq/edit/${item.id}`)}
                             title="Edit FAQ Group"
                             className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
                           >
                             <Edit2 className="h-3.5 w-3.5 text-[#9E7432]" />
                           </button>
-
-                          {/* Inline Accordion Expand Button */}
-                          <button
-                            type="button"
-                            onClick={() => toggleCardExpand(id)}
-                            title={isExpanded ? 'Collapse questions' : 'Expand questions'}
-                            className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#5C554B] transition cursor-pointer ml-1"
-                          >
-                            {isExpanded ? (
-                              <ChevronUp className="h-3.5 w-3.5" />
-                            ) : (
-                              <ChevronDown className="h-3.5 w-3.5" />
-                            )}
-                          </button>
                         </div>
                       </div>
 
                     </div>
-
-                    {/* Inline Questions List Preview */}
-                    {isExpanded && (
-                      <div className="p-4 sm:p-5 bg-white space-y-2.5 animate-fade-in">
-                        {subs.length === 0 ? (
-                          <p className="text-xs text-[#8C8275] italic py-2">No questions under this topic.</p>
-                        ) : (
-                          subs.map((sub, sIdx) => (
-                            <div
-                              key={sub.id || sIdx}
-                              className="p-3 rounded-xl bg-[#FAF8F5] border border-[#E8E3DA] text-xs space-y-1"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2 font-semibold text-[#1A1817]">
-                                  <span className="text-[#9E7432] font-mono">Q{sIdx + 1}.</span>
-                                  <span>{sub.faq_que}</span>
-                                </div>
-                                {sub.faq_heading && (
-                                  <span className="text-[10px] text-[#8C8275] bg-white px-2 py-0.5 rounded border border-[#E2DDD5]">
-                                    {sub.faq_heading}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[#5C554B] pl-6 text-[11px] leading-relaxed">
-                                {sub.faq_ans}
-                              </p>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
 
                   </div>
                 );
@@ -594,23 +396,12 @@ export default function FaqPage() {
         </main>
       </div>
 
-      {/* Add / Edit FAQ Modal */}
-      <FaqModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleFormSubmit}
-        form={form}
-        setForm={setForm}
-        editingId={editingId}
-        submitting={submitting}
-      />
-
       {/* View / Accordion FAQ Modal */}
       <FaqViewModal
         isOpen={previewModalOpen}
         onClose={() => setPreviewModalOpen(false)}
         item={previewItem}
-        onEdit={(it) => handleOpenEditModal(it)}
+        onEdit={(it) => navigate(`/faq/edit/${it.id}`)}
       />
     </div>
   );

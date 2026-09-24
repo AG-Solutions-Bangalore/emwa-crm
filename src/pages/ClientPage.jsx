@@ -2,9 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
 import ClientModal from '../components/client/ClientModal';
-import ClientViewModal from '../components/client/ClientViewModal';
 import Pagination from '../components/common/Pagination';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import { useAppContext } from '../context/AppContext';
 import {
@@ -14,17 +12,15 @@ import {
   updateClient,
   updateClientStatus,
 } from '../services/clientApi';
+import { getAssetBaseURL } from '../services/api';
 import {
   Plus,
   Search,
   Edit2,
   RefreshCw,
   Building2,
-  Eye,
   CheckCircle2,
   XCircle,
-  LayoutGrid,
-  List,
   Layers,
   Image,
 } from 'lucide-react';
@@ -38,17 +34,6 @@ function extractList(response) {
   if (Array.isArray(response?.clients)) return response.clients;
   if (Array.isArray(response?.client)) return response.client;
   return [];
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return String(dateStr);
-  return d.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
 }
 
 const initialForm = {
@@ -65,7 +50,6 @@ export default function ClientPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
 
   const debouncedSearch = useDebounce(searchQuery, 350);
 
@@ -83,10 +67,6 @@ export default function ClientPage() {
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(initialForm);
 
-  // Preview Modal State
-  const [previewModalOpen, setPreviewModalOpen] = useState(false);
-  const [previewItem, setPreviewItem] = useState(null);
-
   // Base client images URL prefix
   const clientBaseUrl = useMemo(() => {
     const found = (imageUrlConfig || []).find(
@@ -96,17 +76,22 @@ export default function ClientPage() {
         i?.image_for?.toLowerCase() === 'client_image' ||
         i?.image_for?.toLowerCase() === 'client_images'
     );
-    return found?.image_url || 'https://easemarketing.in/emwaapi/public/assets/images/client_images/';
+    const fallbackBase = getAssetBaseURL('/assets/images/client_images/');
+    return found?.image_url || fallbackBase;
   }, [imageUrlConfig]);
 
   const resolveImageUrl = (imageVal) => {
     if (!imageVal) return noImageUrl || '';
     if (typeof imageVal !== 'string') return '';
-    if (imageVal.startsWith('http://') || imageVal.startsWith('https://') || imageVal.startsWith('data:')) {
+    if (imageVal.startsWith('blob:') || imageVal.startsWith('data:')) {
       return imageVal;
     }
-    const cleanBase = clientBaseUrl.replace(/\/$/, '');
-    return `${cleanBase}/${imageVal.replace(/^\//, '')}`;
+    let fullUrl = imageVal;
+    if (!imageVal.startsWith('http://') && !imageVal.startsWith('https://')) {
+      const cleanBase = clientBaseUrl.replace(/\/$/, '');
+      fullUrl = `${cleanBase}/${imageVal.replace(/^\//, '')}`;
+    }
+    return fullUrl;
   };
 
   /* ── 1. GET /client with pagination ── */
@@ -169,68 +154,87 @@ export default function ClientPage() {
   };
 
   const handleOpenEditModal = async (item) => {
-    setEditingId(item.id);
+    const id = item?.id;
+    if (!id) return;
+    setEditingId(id);
     setIsModalOpen(true);
 
-    const imageField = item.clients_image || item.client_image || item.image || item.file_name;
-    const name = item.clients_name || item.client_name || item.name || '';
-    const status = item.clients_status || item.status || 'Active';
+    // Populate immediate values
+    const directName = item?.clients_name || item?.client_name || item?.name || '';
+    const directStatus = item?.clients_status || item?.status || 'Active';
+    const directImage = item?.clients_image || item?.client_image || item?.image || item?.file_name || null;
 
     setForm({
-      clients_name: name,
+      clients_name: directName,
       clients_image: null,
-      clients_status: status,
-      existing_image_url: resolveImageUrl(imageField),
+      clients_status: directStatus,
+      existing_image_url: directImage ? resolveImageUrl(directImage) : null,
     });
 
-    // Optionally fetch fresh item by ID (GET /client/{id})
     try {
-      const res = await getClientById(item.id);
-      const freshData = res?.data || res?.client || res;
-      if (freshData) {
-        const freshImage = freshData.clients_image || freshData.client_image || freshData.image;
-        const freshName = freshData.clients_name || freshData.client_name || freshData.name || name;
-        const freshStatus = freshData.clients_status || freshData.status || status;
+      const res = await getClientById(id);
+      const data = res?.data || res?.client || res || {};
+      if (data && (data.clients_name || data.client_name || data.name || data.id)) {
+        const fetchedName = data.clients_name || data.client_name || data.name || directName;
+        const fetchedStatus = data.clients_status || data.status || directStatus;
+        const fetchedImg = data.clients_image || data.client_image || data.image || data.file_name || directImage;
 
         setForm({
-          clients_name: freshName,
+          clients_name: fetchedName,
           clients_image: null,
-          clients_status: freshStatus,
-          existing_image_url: resolveImageUrl(freshImage),
+          clients_status: fetchedStatus,
+          existing_image_url: fetchedImg ? resolveImageUrl(fetchedImg) : null,
         });
       }
     } catch (err) {
-      // Use existing values
+      console.warn('Could not fetch single client details, using row data:', err);
     }
   };
 
   const handleFormSubmit = async (e) => {
     e?.preventDefault();
-    setSubmitting(true);
+    if (!form.clients_name?.trim()) {
+      toast.error('Please enter the client / partner name.');
+      return;
+    }
 
+    if (!editingId && !form.clients_image) {
+      toast.error('Please upload a client logo.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
+      const payload = new FormData();
+      payload.append('clients_name', form.clients_name.trim());
+      payload.append('clients_status', form.clients_status || 'Active');
+
+      if (form.clients_image instanceof File) {
+        payload.append('clients_image', form.clients_image);
+      }
+
       if (editingId) {
-        // PUT /client/{id}
-        await updateClient(editingId, form);
-        toast.success('Client updated successfully.');
+        payload.append('_method', 'PUT');
+        const res = await updateClient(editingId, payload);
+        toast.success(res?.message || 'Client logo updated successfully!');
       } else {
-        // POST /client
-        await createClient(form);
-        toast.success('Client added successfully.');
+        const res = await createClient(payload);
+        toast.success(res?.message || 'Client logo created successfully!');
       }
 
       setIsModalOpen(false);
       setForm(initialForm);
-      fetchClientList(currentPage, searchQuery, statusFilter);
+      setEditingId(null);
+      fetchClientList(editingId ? currentPage : 1, debouncedSearch, statusFilter);
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to save client.';
+      const msg = err?.response?.data?.message || err?.message || 'Failed to save client logo.';
       toast.error(msg);
     } finally {
       setSubmitting(false);
     }
   };
 
-  /* ── 3. PATCH /clients/{id}/status ── */
+  /* ── 3. Toggle Status (POST /client/status/{id}) ── */
   const handleToggleStatus = async (item) => {
     const id = item.id;
     const currentStatus = item.clients_status || item.status || 'Active';
@@ -254,12 +258,6 @@ export default function ClientPage() {
     }
   };
 
-  /* ── 4. Preview Modal ── */
-  const handleOpenPreview = (item) => {
-    setPreviewItem(item);
-    setPreviewModalOpen(true);
-  };
-
   // Filtered items based on statusFilter tab
   const displayedItems = useMemo(() => {
     if (statusFilter === 'All') return items;
@@ -268,39 +266,6 @@ export default function ClientPage() {
       return st === statusFilter.toLowerCase();
     });
   }, [items, statusFilter]);
-
-  // Metrics
-  const clientStats = useMemo(() => {
-    const total = totalCount || items.length;
-    const active = items.filter((it) => (it.clients_status || it.status || 'Active').toLowerCase() === 'active' || (it.clients_status || it.status) === '1').length;
-    const inactive = items.filter((it) => (it.clients_status || it.status || '').toLowerCase() === 'inactive' || (it.clients_status || it.status) === '0').length;
-    return [
-      {
-        label: 'Total Client Logos',
-        value: total,
-        icon: Building2,
-        color: 'emerald',
-        filterValue: 'All',
-        subtext: 'Partner brand portfolio',
-      },
-      {
-        label: 'Active Logos',
-        value: active,
-        icon: CheckCircle2,
-        color: 'amber',
-        filterValue: 'Active',
-        subtext: 'Visible in brand showcase',
-      },
-      {
-        label: 'Inactive Logos',
-        value: inactive,
-        icon: XCircle,
-        color: 'rose',
-        filterValue: 'Inactive',
-        subtext: 'Hidden from public view',
-      },
-    ];
-  }, [items, totalCount]);
 
   return (
     <div className="flex min-h-screen bg-[#F8F6F0] text-[#1A1817]">
@@ -342,60 +307,18 @@ export default function ClientPage() {
             </div>
           </div>
 
-          {/* Unique Stats Summary Cards */}
-          <StatsSummaryBar
-            stats={clientStats}
-            activeFilter={statusFilter}
-            onSelectFilter={(filter) => {
-              setStatusFilter(filter);
-              setCurrentPage(1);
-            }}
-          />
-
           {/* Search & Filter Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            
-            <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full sm:w-72">
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center w-full sm:w-80">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9C9488] pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by client or company name..."
+                placeholder="Search client or partner name..."
                 className="w-full pl-8 pr-3 py-1.5 text-[11px] rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition-all shadow-2xs placeholder-[#9C9488]"
               />
             </form>
-
-            <div className="flex items-center gap-2.5 self-end sm:self-auto">
-              {/* View Mode Toggle */}
-              <div className="inline-flex rounded-lg border border-[#E2DDD5] bg-[#FAF8F5] p-0.5 shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('grid')}
-                  title="Grid View"
-                  className={`p-1 rounded-md transition cursor-pointer ${
-                    viewMode === 'grid'
-                      ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
-                      : 'text-[#5C554B] hover:text-[#1A1817]'
-                  }`}
-                >
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('table')}
-                  title="Table View"
-                  className={`p-1 rounded-md transition cursor-pointer ${
-                    viewMode === 'table'
-                      ? 'bg-[#1A1817] text-[#FAF8F5] shadow-xs'
-                      : 'text-[#5C554B] hover:text-[#1A1817]'
-                  }`}
-                >
-                  <List className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-
           </div>
 
           {/* Main Content Area */}
@@ -423,128 +346,18 @@ export default function ClientPage() {
                 <span>Add First Client</span>
               </button>
             </div>
-          ) : viewMode === 'grid' ? (
-            /* ── GRID VIEW ── */
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-4">
-                {displayedItems.map((item, index) => {
-                  const id = item.id;
-                  const name = item.clients_name || item.client_name || item.name || 'Client Partner';
-                  const imageField = item.clients_image || item.client_image || item.image || item.file_name;
-                  const imageUrl = resolveImageUrl(imageField);
-                  const status = item.clients_status || item.status || 'Active';
-                  const isActive = status === 'Active';
-                  const date = item.created_at || item.createdDate || item.date;
-
-                  return (
-                    <div
-                      key={id || index}
-                      className="group bg-white rounded-2xl border border-[#E8E3DA] overflow-hidden shadow-2xs hover:shadow-md transition-all duration-200 flex flex-col justify-between"
-                    >
-                      {/* Logo Display Box */}
-                      <div className="relative aspect-4/3 bg-[#FAF8F5] flex items-center justify-center p-4 border-b border-[#F0ECE3] overflow-hidden">
-                        {imageUrl ? (
-                          <img
-                            src={imageUrl}
-                            alt={name}
-                            className="max-h-20 max-w-[85%] object-contain group-hover:scale-105 transition-transform duration-200"
-                            onError={(e) => {
-                              e.currentTarget.src = noImageUrl || '';
-                            }}
-                          />
-                        ) : (
-                          <Building2 className="h-8 w-8 text-[#9E7432] opacity-40" />
-                        )}
-
-                        {/* Top ID Badge */}
-                        <div className="absolute top-2.5 right-2.5">
-                          <span className="font-mono text-[10px] font-semibold bg-white/90 text-[#78716C] px-1.5 py-0.5 rounded shadow-2xs border border-[#E8E3DA]">
-                            #{id}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Card Content & Actions */}
-                      <div className="p-3.5 space-y-2.5 bg-white">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="text-xs font-bold text-[#1A1817] truncate" title={name}>
-                            {name}
-                          </h4>
-
-                          {/* Quick Status Toggle */}
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStatus(item)}
-                            title="Click to toggle status"
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold transition cursor-pointer flex-shrink-0 ${
-                              isActive
-                                ? 'bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB]'
-                                : 'bg-[#FBEAEA] text-[#9A2D2D] border border-[#F5C6CB]'
-                            }`}
-                          >
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-[#1E7E34]' : 'bg-[#9A2D2D]'}`}
-                            />
-                            {status}
-                          </button>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] text-[#8C8275] pt-2 border-t border-[#F0ECE3]">
-                          <span>{formatDate(date)}</span>
-
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenPreview(item)}
-                              className="p-1 rounded hover:bg-[#FAF8F5] text-[#5C554B] hover:text-[#1A1817] transition cursor-pointer"
-                              title="Preview Logo"
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(item)}
-                              className="p-1 rounded hover:bg-[#FAF8F5] text-[#5C554B] hover:text-[#9E7432] transition cursor-pointer"
-                              title="Edit Client"
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                      </div>
-
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Pagination */}
-              <div className="bg-white rounded-xl border border-[#E8E3DA] overflow-hidden shadow-2xs">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  totalCount={totalCount}
-                  perPage={perPage}
-                  onPageChange={handlePageChange}
-                  from={from}
-                  to={to}
-                />
-              </div>
-            </div>
           ) : (
             /* ── TABLE VIEW ── */
             <div className="bg-white rounded-2xl border border-[#E8E3DA] overflow-hidden shadow-2xs">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#E8E3DA] bg-[#FAF8F5] font-semibold text-[#5C554B]">
-                      <th className="px-4 py-3 w-14">#</th>
+                <table className="w-full text-left text-xs text-[#3D372E] border-collapse">
+                  <thead className="bg-[#FAF8F5] border-b border-[#E8E3DA] text-xs uppercase font-semibold text-[#78716C] tracking-wider">
+                    <tr>
+                      <th className="px-4 py-3 w-20">Sl.No</th>
                       <th className="px-4 py-3 w-28">Logo</th>
                       <th className="px-4 py-3">Client / Partner Name</th>
-                      <th className="px-4 py-3">Added Date</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
+                      <th className="px-4 py-3 w-40 text-center">Status</th>
+                      <th className="px-4 py-3 w-24 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#F0ECE3]">
@@ -556,23 +369,19 @@ export default function ClientPage() {
                       const status = item.clients_status || item.status || 'Active';
                       const isActive = status === 'Active';
                       const rowNumber = (currentPage - 1) * perPage + index + 1;
-                      const date = item.created_at || item.createdDate || item.date;
 
                       return (
                         <tr key={id || index} className="hover:bg-[#FAF8F5] transition-colors">
-                          <td className="px-4 py-3 font-mono text-xs text-[#9C9488]">{rowNumber}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-[#9C9488] align-middle">{rowNumber}</td>
                           
-                          {/* Logo Preview */}
-                          <td className="px-4 py-3">
-                            <div
-                              onClick={() => handleOpenPreview(item)}
-                              className="h-9 w-16 rounded-lg bg-[#FAF8F5] border border-[#E8E3DA] p-1 overflow-hidden cursor-pointer hover:border-[#C99C4B] transition flex items-center justify-center group"
-                            >
+                          {/* Logo */}
+                          <td className="px-4 py-3 align-middle">
+                            <div className="h-11 w-18 rounded-lg bg-[#FAF8F5] border border-[#E8E3DA] p-1 overflow-hidden flex items-center justify-center shadow-2xs">
                               {imageUrl ? (
                                 <img
                                   src={imageUrl}
                                   alt={name}
-                                  className="h-full w-full object-contain group-hover:scale-105 transition-transform"
+                                  className="h-full w-full object-contain"
                                   onError={(e) => {
                                     e.currentTarget.src = noImageUrl || '';
                                   }}
@@ -584,49 +393,39 @@ export default function ClientPage() {
                           </td>
 
                           {/* Client Name */}
-                          <td className="px-4 py-3 font-semibold text-[#1A1817]">
-                            {name}
+                          <td className="px-4 py-3 align-middle">
+                            <span className="text-xs font-medium text-[#1A1817] truncate max-w-sm">
+                              {name}
+                            </span>
                           </td>
 
-                          {/* Date */}
-                          <td className="px-4 py-3 text-[#8C8275]">{formatDate(date)}</td>
-
-                          {/* Status Pill Toggle */}
-                          <td className="px-4 py-3">
+                          {/* Status Pill Toggle (Centered) */}
+                          <td className="px-4 py-3 align-middle text-center">
                             <button
                               type="button"
                               onClick={() => handleToggleStatus(item)}
                               title="Click to toggle status"
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer ${
                                 isActive
-                                  ? 'bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB] hover:bg-[#D4EDDA]'
-                                  : 'bg-[#FBEAEA] text-[#9A2D2D] border border-[#F5C6CB] hover:bg-[#F8D7DA]'
+                                  ? 'bg-[#EDF7EE] text-[#1E6B34] border-[#C6E6CC] hover:bg-[#DFF0E1]'
+                                  : 'bg-[#FDF0F0] text-[#9A2D2D] border-[#F6C8C8] hover:bg-[#FBE4E4]'
                               }`}
                             >
                               <span
-                                className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-[#1E7E34]' : 'bg-[#9A2D2D]'}`}
+                                className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-[#1E6B34]' : 'bg-[#9A2D2D]'}`}
                               />
-                              {status}
+                              <span>{status}</span>
                             </button>
                           </td>
 
-                          {/* Actions */}
-                          <td className="px-4 py-3 text-right">
-                            <div className="inline-flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenPreview(item)}
-                                title="View Logo"
-                                className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </button>
-
+                          {/* Actions (Edit only) */}
+                          <td className="px-4 py-3 align-middle text-right">
+                            <div className="inline-flex items-center justify-end">
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditModal(item)}
                                 title="Edit Client"
-                                className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] transition shadow-2xs cursor-pointer"
+                                className="p-1.5 rounded-lg border border-[#DDD7CD] bg-white hover:bg-[#EFECE6] text-[#4A443D] hover:text-[#9E7432] transition shadow-2xs cursor-pointer inline-flex items-center justify-center"
                               >
                                 <Edit2 className="h-3.5 w-3.5 text-[#9E7432]" />
                               </button>
@@ -664,15 +463,6 @@ export default function ClientPage() {
         setForm={setForm}
         editingId={editingId}
         submitting={submitting}
-      />
-
-      {/* View Client Modal */}
-      <ClientViewModal
-        isOpen={previewModalOpen}
-        onClose={() => setPreviewModalOpen(false)}
-        item={previewItem}
-        imageUrl={previewItem ? resolveImageUrl(previewItem.clients_image || previewItem.client_image || previewItem.image || previewItem.file_name) : ''}
-        onEdit={(it) => handleOpenEditModal(it)}
       />
     </div>
   );

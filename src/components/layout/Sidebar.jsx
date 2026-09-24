@@ -3,8 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
 import { useAuthContext } from '../../context/AuthContext';
 import LogoutConfirmModal from '../common/LogoutConfirmModal';
-import { 
-  LayoutDashboard, 
+import {
+  LayoutDashboard,
   Layers,
   Image as ImageIcon,
   Building2,
@@ -20,7 +20,8 @@ import {
   MailCheck,
   Send,
   LogOut,
-  PanelLeft
+  PanelLeft,
+  Download,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -28,11 +29,11 @@ const dashboardItem = { label: 'Dashboard', to: '/dashboard', icon: LayoutDashbo
 
 const websiteNavItems = [
   { label: 'Category', to: '/category', icon: Layers },
-  { label: 'Gallery', to: '/gallery', icon: ImageIcon },
+  { label: 'Blogs Gallery', to: '/gallery', icon: ImageIcon },
+  { label: 'Blogs', to: '/blog', icon: FileText },
   { label: 'Client', to: '/client', icon: Building2 },
   { label: 'FAQ', to: '/faq', icon: HelpCircle },
   { label: 'Testimonial', to: '/testimonial', icon: Quote },
-  { label: 'Blogs', to: '/blog', icon: FileText },
   { label: 'Enquiries', to: '/enquiry', icon: MessageSquareText },
   { label: 'Newsletter', to: '/newsletter', icon: Mail },
 ];
@@ -46,22 +47,28 @@ const marketingNavItems = [
   { label: 'WhatsApp Campaign', to: '/whatsapp-campaign', icon: Send, requires: 'whatsapp' },
 ];
 
+const reportsNavItems = [
+  { label: 'Downloads', to: '/downloads', icon: Download },
+];
+
 export const Sidebar = () => {
   const navigate = useNavigate();
   const { companyInfo, companyLogoUrl, isSidebarCollapsed, toggleSidebar } = useAppContext();
-  const { user, logout, hasEmail, hasWhatsApp } = useAuthContext();
+  const { user, logout, hasEmail, hasWhatsApp, isAdmin } = useAuthContext();
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // Filter marketing items according to user channel permissions
+  // Filter marketing items according to user role and channel permissions
+  // If user_type === 1 (standard user), marketing is completely hidden
   const visibleMarketingItems = useMemo(() => {
+    if (!isAdmin) return [];
     return marketingNavItems.filter((item) => {
       if (item.requires === 'email') return hasEmail;
       if (item.requires === 'whatsapp') return hasWhatsApp;
       if (item.requires === 'any') return hasEmail || hasWhatsApp;
       return true;
     });
-  }, [hasEmail, hasWhatsApp]);
+  }, [isAdmin, hasEmail, hasWhatsApp]);
 
   const handleConfirmLogout = async () => {
     setLoggingOut(true);
@@ -84,12 +91,10 @@ export const Sidebar = () => {
       to={to}
       title={isSidebarCollapsed ? label : undefined}
       className={({ isActive }) =>
-        `flex items-center ${
-          isSidebarCollapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2'
-        } rounded-xl text-sm font-medium transition-all duration-150 ${
-          isActive
-            ? 'bg-[#1A1817] text-[#FAF8F5] shadow-2xs font-semibold'
-            : 'text-[#5C554B] hover:bg-[#EDE8DE] hover:text-[#1A1817]'
+        `flex items-center ${isSidebarCollapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2'
+        } rounded-xl text-sm font-medium transition-all duration-150 ${isActive
+          ? 'bg-[#1A1817] text-[#FAF8F5] shadow-2xs font-semibold'
+          : 'text-[#5C554B] hover:bg-[#EDE8DE] hover:text-[#1A1817]'
         }`
       }
     >
@@ -112,9 +117,8 @@ export const Sidebar = () => {
   return (
     <>
       <aside
-        className={`sticky top-0 flex h-screen ${
-          isSidebarCollapsed ? 'w-20 px-2' : 'w-64 px-4'
-        } flex-col justify-between border-r border-[#E8E3DA] bg-[#F7F4EE] py-4 text-[#1A1817] select-none flex-shrink-0 z-30 transition-all duration-300`}
+        className={`sticky top-0 flex h-screen ${isSidebarCollapsed ? 'w-20 px-2' : 'w-64 px-4'
+          } flex-col justify-between border-r border-[#E8E3DA] bg-[#F7F4EE] py-4 text-[#1A1817] select-none flex-shrink-0 z-30 transition-all duration-300`}
       >
         {/* Brand Header */}
         <div>
@@ -158,10 +162,10 @@ export const Sidebar = () => {
                 </div>
                 <div className="min-w-0">
                   <h1 className="text-xs font-bold text-[#1A1817] truncate tracking-tight">
-                    {companyInfo?.company_name || 'AG Solutions'}
+                    {companyInfo?.company_name || 'Admin Portal'}
                   </h1>
                   <p className="text-[11px] font-medium tracking-wide text-[#8C8275]">
-                    Admin Portal
+                    {companyInfo?.company_short ? `${companyInfo.company_short} Portal` : 'Admin Portal'}
                   </p>
                 </div>
               </div>
@@ -179,7 +183,7 @@ export const Sidebar = () => {
 
           {/* Navigation Links with Section Headings */}
           <nav className="mt-3 space-y-1 max-h-[calc(100vh-165px)] overflow-y-auto pr-0.5 custom-scrollbar">
-            
+
             {/* 1. Dashboard (Top-level) */}
             {renderNavLink(dashboardItem)}
 
@@ -213,21 +217,33 @@ export const Sidebar = () => {
               </div>
             )}
 
+            {/* 4. REPORTS Section */}
+            <div className="pt-2">
+              {!isSidebarCollapsed ? (
+                <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[#9C9488]">
+                  Reports
+                </div>
+              ) : (
+                <div className="my-1.5 border-t border-[#E8E3DA]" />
+              )}
+              <div className="space-y-0.5">
+                {reportsNavItems.map(renderNavLink)}
+              </div>
+            </div>
+
           </nav>
         </div>
 
         {/* Clickable Admin Profile Footer & Logout Button */}
         <div
-          className={`border-t border-[#E8E3DA] pt-3 px-1 flex items-center ${
-            isSidebarCollapsed ? 'flex-col gap-2' : 'justify-between'
-          }`}
+          className={`border-t border-[#E8E3DA] pt-3 px-1 flex items-center ${isSidebarCollapsed ? 'flex-col gap-2' : 'justify-between'
+            }`}
         >
           <div
             onClick={() => navigate('/profile')}
             title={`View & Edit Profile (${user?.name || 'Admin'})`}
-            className={`flex items-center ${
-              isSidebarCollapsed ? 'justify-center p-1' : 'gap-2.5 min-w-0 flex-1 p-1'
-            } rounded-xl hover:bg-[#EDE8DE] transition cursor-pointer group`}
+            className={`flex items-center ${isSidebarCollapsed ? 'justify-center p-1' : 'gap-2.5 min-w-0 flex-1 p-1'
+              } rounded-xl hover:bg-[#EDE8DE] transition cursor-pointer group`}
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E5DFD5] group-hover:bg-[#1A1817] group-hover:text-[#FAF8F5] text-sm font-semibold text-[#1A1817] transition shadow-2xs shrink-0">
               {user?.name?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || 'A'}
@@ -237,9 +253,11 @@ export const Sidebar = () => {
                 <div className="text-sm font-semibold text-[#1A1817] truncate transition">
                   {user?.name || user?.username || 'admin'}
                 </div>
-                <div className="text-xs text-[#8C8275] truncate">
-                  {companyInfo?.company_place || 'Bangalore'}
-                </div>
+                {companyInfo?.company_place && (
+                  <div className="text-xs text-[#8C8275] truncate">
+                    {companyInfo.company_place}
+                  </div>
+                )}
               </div>
             )}
           </div>

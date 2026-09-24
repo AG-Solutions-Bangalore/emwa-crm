@@ -35,6 +35,9 @@ function buildTestimonialFormData(payload, isUpdate = false) {
 
   if (isUpdate) {
     formData.append('_method', 'PUT');
+    const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    formData.append('testimonial_updated_date', nowStr);
+    formData.append('updated_at', nowStr);
   }
 
   return formData;
@@ -89,6 +92,7 @@ export const getTestimonialById = async (id) => {
  */
 export const updateTestimonial = async (id, payload) => {
   const formData = buildTestimonialFormData(payload, true);
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
   try {
     const response = await api.post(`/testimonial/${id}`, formData, {
@@ -102,6 +106,8 @@ export const updateTestimonial = async (id, payload) => {
       testimonial_description: String(payload.testimonial_description || '').trim(),
       testimonial_rating: String(payload.testimonial_rating || '5').trim(),
       testimonial_status: String(payload.testimonial_status || 'Active').trim(),
+      testimonial_updated_date: nowStr,
+      updated_at: nowStr,
     });
     return response.data;
   }
@@ -113,8 +119,11 @@ export const updateTestimonial = async (id, payload) => {
  */
 export const updateTestimonialStatus = async (id, testimonial_status) => {
   const statusVal = String(testimonial_status || 'Active').trim();
+  const nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
   const formData = new FormData();
   formData.append('testimonial_status', statusVal);
+  formData.append('testimonial_updated_date', nowStr);
+  formData.append('updated_at', nowStr);
 
   try {
     const response = await api.patch(`/testimonials/${id}/status`, formData, {
@@ -124,6 +133,8 @@ export const updateTestimonialStatus = async (id, testimonial_status) => {
   } catch (err) {
     const response = await api.patch(`/testimonials/${id}/status`, {
       testimonial_status: statusVal,
+      testimonial_updated_date: nowStr,
+      updated_at: nowStr,
     });
     return response.data;
   }

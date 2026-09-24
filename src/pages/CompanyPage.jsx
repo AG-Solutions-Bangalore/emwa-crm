@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import Sidebar from '../components/layout/Sidebar';
 import Header from '../components/layout/Header';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import { useAppContext } from '../context/AppContext';
 import { getCompanyDetails, updateCompanyDetails } from '../services/companyApi';
 import {
@@ -86,18 +85,18 @@ export default function CompanyPage() {
   const handleOpenEdit = () => {
     const current = details || companyInfo || {};
     setForm({
-      company_name: current.company_name || 'AG Solutions',
-      company_short: current.company_short || 'AGS',
-      company_email: current.company_email || 'info@ag-solutions.in',
+      company_name: current.company_name || '',
+      company_short: current.company_short || '',
+      company_email: current.company_email || '',
       company_mobile_no: current.company_mobile_no || current.mobile || '',
       company_phone: current.company_phone || current.phone || '',
       company_address: current.company_address || '',
-      company_place: current.company_place || 'Bangalore',
-      company_website: current.company_website || 'https://ag-solutions.in',
+      company_place: current.company_place || '',
+      company_website: current.company_website || '',
       company_about: current.company_about || '',
       company_logo: null,
     });
-    setLogoPreview(companyLogoUrl || '/ag-logo-icon.png');
+    setLogoPreview(companyLogoUrl || '/no_image.jpg');
     setIsEditModalOpen(true);
   };
 
@@ -144,7 +143,7 @@ export default function CompanyPage() {
     },
     {
       label: 'BASE LOCATION',
-      value: details?.company_place || companyInfo?.company_place || 'Bangalore',
+      value: details?.company_place || companyInfo?.company_place || '—',
       icon: MapPin,
       color: 'amber',
     },
@@ -174,7 +173,7 @@ export default function CompanyPage() {
                 Company Profile & Settings
               </h1>
               <p className="text-xs text-[#78716C] mt-0.5">
-                Manage your enterprise identity, corporate address, branding, and contact channels
+                Manage enterprise identity, address, branding, and contact channels
               </p>
             </div>
 
@@ -198,9 +197,6 @@ export default function CompanyPage() {
             </div>
           </div>
 
-          {/* Stats Summary Bar */}
-          <StatsSummaryBar stats={companyStats} />
-
           {/* Company Profile Main Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             
@@ -210,25 +206,27 @@ export default function CompanyPage() {
                 {/* Logo Badge */}
                 <div className="h-20 w-20 rounded-2xl bg-[#FAF8F5] border border-[#E8E3DA] p-2.5 flex items-center justify-center shadow-xs mb-3.5 overflow-hidden">
                   <img
-                    src={companyLogoUrl || '/ag-logo-icon.png'}
-                    alt={current.company_name || 'AG Solutions'}
+                    src={companyLogoUrl || '/no_image.jpg'}
+                    alt={current.company_name || 'Logo'}
                     className="h-full w-full object-contain"
-                    onError={(e) => { e.currentTarget.src = '/ag-logo-icon.png'; }}
+                    onError={(e) => { e.currentTarget.src = '/no_image.jpg'; }}
                   />
                 </div>
 
                 <h2 className="text-base font-bold text-[#1A1817] tracking-tight">
-                  {current.company_name || 'AG Solutions'}
+                  {current.company_name || '—'}
                 </h2>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FAF4EA] border border-[#EADDC5] text-[#9E7432] text-[11px] font-semibold mt-1">
-                  <span>{current.company_short || 'AGS'}</span>
-                  <span>•</span>
-                  <span>Enterprise</span>
-                </div>
+                {current.company_short && (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FAF4EA] border border-[#EADDC5] text-[#9E7432] text-[11px] font-semibold mt-1">
+                    <span>{current.company_short}</span>
+                  </div>
+                )}
 
-                <p className="text-xs text-[#78716C] mt-3 leading-relaxed max-w-xs">
-                  {current.company_about || 'Unified customer relationship management and automated marketing operations portal.'}
-                </p>
+                {current.company_about && (
+                  <p className="text-xs text-[#78716C] mt-3 leading-relaxed max-w-xs">
+                    {current.company_about}
+                  </p>
+                )}
               </div>
 
               {/* Quick Status Bar */}
@@ -256,7 +254,7 @@ export default function CompanyPage() {
                       Organization Name
                     </span>
                     <span className="font-semibold text-[#1A1817] text-xs">
-                      {current.company_name || 'AG Solutions'}
+                      {current.company_name || '—'}
                     </span>
                   </div>
 
@@ -266,7 +264,7 @@ export default function CompanyPage() {
                       Short Code / Acronym
                     </span>
                     <span className="font-semibold text-[#1A1817] text-xs font-mono">
-                      {current.company_short || 'AGS'}
+                      {current.company_short || '—'}
                     </span>
                   </div>
 
@@ -276,12 +274,16 @@ export default function CompanyPage() {
                       <Mail className="h-3 w-3 text-[#9E7432]" />
                       Official Email
                     </span>
-                    <a
-                      href={`mailto:${current.company_email || 'info@ag-solutions.in'}`}
-                      className="font-semibold text-[#1A1817] text-xs hover:text-[#9E7432] transition"
-                    >
-                      {current.company_email || 'info@ag-solutions.in'}
-                    </a>
+                    {current.company_email ? (
+                      <a
+                        href={`mailto:${current.company_email}`}
+                        className="font-semibold text-[#1A1817] text-xs hover:text-[#9E7432] transition"
+                      >
+                        {current.company_email}
+                      </a>
+                    ) : (
+                      <span className="text-[#8C8275]">—</span>
+                    )}
                   </div>
 
                   {/* Phone / Mobile */}
@@ -291,7 +293,7 @@ export default function CompanyPage() {
                       Phone / Mobile
                     </span>
                     <span className="font-semibold text-[#1A1817] text-xs">
-                      {current.company_mobile_no || current.company_phone || current.mobile || '+91 98765 43210'}
+                      {current.company_mobile_no || current.company_phone || current.mobile || '—'}
                     </span>
                   </div>
 
@@ -302,7 +304,7 @@ export default function CompanyPage() {
                       Registered Business Address
                     </span>
                     <span className="font-medium text-[#1A1817] text-xs leading-relaxed">
-                      {current.company_address || `${current.company_place || 'Bangalore'}, Karnataka, India`}
+                      {current.company_address || current.company_place || '—'}
                     </span>
                   </div>
 
@@ -312,21 +314,30 @@ export default function CompanyPage() {
                       <Globe className="h-3 w-3 text-[#9E7432]" />
                       Official Website
                     </span>
-                    <a
-                      href={current.company_website || 'https://ag-solutions.in'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-semibold text-[#9E7432] text-xs hover:underline"
-                    >
-                      {current.company_website || 'https://ag-solutions.in'}
-                    </a>
+                    {current.company_website ? (
+                      <a
+                        href={current.company_website.startsWith('http') ? current.company_website : `https://${current.company_website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-[#9E7432] text-xs hover:underline"
+                      >
+                        {current.company_website}
+                      </a>
+                    ) : (
+                      <span className="text-[#8C8275]">—</span>
+                    )}
                   </div>
 
                 </div>
               </div>
 
               <div className="pt-4 mt-4 border-t border-[#F0ECE3] flex items-center justify-between text-xs text-[#8C8275]">
-                <span>Last Synchronized: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                <span>Last Synchronized: {(() => {
+                  const d = new Date();
+                  const day = String(d.getDate()).padStart(2, '0');
+                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                  return `${day}/${month}/${d.getFullYear()}`;
+                })()}</span>
                 <span className="font-mono text-[11px] text-[#9E7432]">API Connected</span>
               </div>
             </div>
@@ -401,7 +412,7 @@ export default function CompanyPage() {
                     required
                     value={form.company_name}
                     onChange={(e) => setForm((prev) => ({ ...prev, company_name: e.target.value }))}
-                    placeholder="e.g. AG Solutions"
+                    placeholder="Enter company name"
                     className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E2DDD5] bg-white text-[#1A1817] focus:outline-none focus:border-[#C99C4B]"
                   />
                 </div>
@@ -415,7 +426,7 @@ export default function CompanyPage() {
                     type="text"
                     value={form.company_short}
                     onChange={(e) => setForm((prev) => ({ ...prev, company_short: e.target.value }))}
-                    placeholder="e.g. AGS"
+                    placeholder="Enter short code"
                     className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E2DDD5] bg-white text-[#1A1817] focus:outline-none focus:border-[#C99C4B]"
                   />
                 </div>
@@ -429,7 +440,7 @@ export default function CompanyPage() {
                     type="email"
                     value={form.company_email}
                     onChange={(e) => setForm((prev) => ({ ...prev, company_email: e.target.value }))}
-                    placeholder="info@ag-solutions.in"
+                    placeholder="company@domain.com"
                     className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E2DDD5] bg-white text-[#1A1817] focus:outline-none focus:border-[#C99C4B]"
                   />
                 </div>
@@ -443,7 +454,7 @@ export default function CompanyPage() {
                     type="text"
                     value={form.company_mobile_no}
                     onChange={(e) => setForm((prev) => ({ ...prev, company_mobile_no: e.target.value }))}
-                    placeholder="+91 98765 43210"
+                    placeholder="Phone or mobile number"
                     className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E2DDD5] bg-white text-[#1A1817] focus:outline-none focus:border-[#C99C4B]"
                   />
                 </div>
@@ -457,7 +468,7 @@ export default function CompanyPage() {
                     type="text"
                     value={form.company_place}
                     onChange={(e) => setForm((prev) => ({ ...prev, company_place: e.target.value }))}
-                    placeholder="e.g. Bangalore"
+                    placeholder="City or location"
                     className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E2DDD5] bg-white text-[#1A1817] focus:outline-none focus:border-[#C99C4B]"
                   />
                 </div>
@@ -471,7 +482,7 @@ export default function CompanyPage() {
                     type="url"
                     value={form.company_website}
                     onChange={(e) => setForm((prev) => ({ ...prev, company_website: e.target.value }))}
-                    placeholder="https://ag-solutions.in"
+                    placeholder="https://company.com"
                     className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E2DDD5] bg-white text-[#1A1817] focus:outline-none focus:border-[#C99C4B]"
                   />
                 </div>

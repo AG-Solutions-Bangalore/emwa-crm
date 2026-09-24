@@ -28,7 +28,6 @@ import {
   deleteEmailCampaign,
 } from '../services/emailCampaignApi';
 import Pagination from '../components/common/Pagination';
-import StatsSummaryBar from '../components/common/StatsSummaryBar';
 import useDebounce from '../hooks/useDebounce';
 import toast from 'react-hot-toast';
 
@@ -217,16 +216,6 @@ export default function EmailCampaignPage() {
             </div>
           </div>
 
-          {/* Unique Stats Summary Cards */}
-          <StatsSummaryBar
-            stats={emailStats}
-            activeFilter={statusFilter}
-            onSelectFilter={(filter) => {
-              setStatusFilter(filter);
-              setCurrentPage(1);
-            }}
-          />
-
           {/* Search & Filter Toolbar */}
           <div className="bg-white px-3.5 py-2.5 rounded-xl border border-[#E8E3DA] shadow-2xs mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
@@ -277,7 +266,7 @@ export default function EmailCampaignPage() {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-[#E8E3DA] bg-[#FAF8F5] font-semibold text-[#5C554B]">
-                  <th className="py-3 px-4 w-12 text-center">#</th>
+                  <th className="py-3 px-4 w-16 text-center">Sl.No</th>
                   <th className="py-3 px-4">Campaign & Subject</th>
                   <th className="py-3 px-4">Schedule Date</th>
                   <th className="py-3 px-4">Holiday Rule</th>

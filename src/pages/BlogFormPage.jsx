@@ -25,6 +25,7 @@ import {
   getBlogById,
 } from '../services/blogApi';
 import { getActiveCategories } from '../services/categoryApi';
+import { getAssetBaseURL } from '../services/api';
 import RichTextEditor from '../components/common/RichTextEditor';
 import toast from 'react-hot-toast';
 
@@ -37,7 +38,7 @@ function slugify(text) {
     .replace(/^-+|-+$/g, '');
 }
 
-function resolveImageUrl(url, baseUrl = 'https://easemarketing.in/emwaapi/public/assets/images/blog_images/') {
+function resolveImageUrl(url, baseUrl = getAssetBaseURL('/assets/images/blog_images/')) {
   if (!url) return null;
   if (url.startsWith('blob:') || url.startsWith('data:')) {
     return url;
@@ -64,7 +65,7 @@ export default function BlogFormPage() {
   const [fetchingData, setFetchingData] = useState(false);
   const [errors, setErrors] = useState({});
   const [manualSlug, setManualSlug] = useState(false);
-  const [imageBaseUrl, setImageBaseUrl] = useState('https://easemarketing.in/emwaapi/public/assets/images/blog_images/');
+  const [imageBaseUrl, setImageBaseUrl] = useState(() => getAssetBaseURL('/assets/images/blog_images/'));
 
   const [form, setForm] = useState({
     blog_title: '',
@@ -108,37 +109,50 @@ export default function BlogFormPage() {
     setFetchingData(true);
     try {
       const res = await getBlogById(blogId);
-      const data = res?.data?.data || res?.data || res?.blog || res || {};
+      let data = res?.data?.data || res?.data?.blog || res?.data || res?.blog || res?.blogs || res || {};
+      if (Array.isArray(data)) {
+        data = data[0] || {};
+      }
 
-      const title = data?.blog_title || data?.title || data?.name || '';
+      const title = data?.blog_title || data?.title || data?.name || data?.blog_meta_title || '';
       const slug = data?.blog_slug || data?.slug || data?.url_slug || slugify(title);
-      const rawImg = data?.blog_banner_image || data?.banner_image || data?.image || data?.banner_image_url;
+      const rawImg = data?.blog_banner_image || data?.banner_image || data?.image || data?.blog_image || data?.banner || data?.banner_image_url || data?.image_url;
 
+      let resolvedBase = imageBaseUrl;
       if (Array.isArray(res?.image_url)) {
         const blogImg = res.image_url.find((img) => img.image_for?.toLowerCase() === 'blog');
         if (blogImg?.image_url) {
-          setImageBaseUrl(blogImg.image_url);
+          resolvedBase = blogImg.image_url;
+          setImageBaseUrl(resolvedBase);
         }
       }
+
+      const isFront = data?.blog_front === true || String(data?.blog_front) === '1' || data?.blog_front === 'Active' || data?.front === true || String(data?.front) === '1' || data?.front === 'Active' || String(data?.blog_front || data?.front).toLowerCase() === 'yes';
+      const isFeatured = data?.blog_featured === true || String(data?.blog_featured) === '1' || data?.blog_featured === 'Active' || data?.featured === true || String(data?.featured) === '1' || data?.featured === 'Active' || String(data?.blog_featured || data?.featured).toLowerCase() === 'yes';
+      const isIndex = data?.blog_index !== undefined && data?.blog_index !== null
+        ? String(data?.blog_index)
+        : data?.index !== undefined && data?.index !== null
+        ? String(data?.index)
+        : '1';
 
       setForm({
         blog_title: title,
         blog_slug: slug,
-        blog_short_description: data?.blog_short_description || data?.short_description || data?.excerpt || '',
-        blog_description: data?.blog_description || data?.description || data?.content || '',
-        blog_categories_ids: String(data?.blog_categories_ids || data?.category_id || data?.categories_id || ''),
+        blog_short_description: data?.blog_short_description || data?.short_description || data?.excerpt || data?.blog_meta_description || data?.meta_description || '',
+        blog_description: data?.blog_description || data?.description || data?.content || data?.body || data?.blog_content || '',
+        blog_categories_ids: String(data?.blog_categories_ids || data?.category_id || data?.categories_id || data?.categories_ids || ''),
         blog_banner_image: null,
-        blog_banner_image_alt: data?.blog_banner_image_alt || data?.banner_image_alt || data?.alt_text || '',
+        blog_banner_image_alt: data?.blog_banner_image_alt || data?.banner_image_alt || data?.alt_text || data?.alt || '',
         blog_meta_keywords: data?.blog_meta_keywords || data?.meta_keywords || data?.keywords || '',
         blog_status: data?.blog_status || data?.status || 'Active',
-        blog_index: String(data?.blog_index ?? data?.index ?? '1'),
-        blog_front: String(data?.blog_front ?? data?.front ?? data?.is_home ?? '0'),
-        blog_featured: String(data?.blog_featured ?? data?.featured ?? data?.is_featured ?? '0'),
+        blog_index: isIndex === '0' || isIndex === 'false' ? '0' : '1',
+        blog_front: isFront ? '1' : '0',
+        blog_featured: isFeatured ? '1' : '0',
         banner_image_url: rawImg,
       });
 
       if (rawImg) {
-        setPreviewImage(resolveImageUrl(rawImg, imageBaseUrl));
+        setPreviewImage(resolveImageUrl(rawImg, resolvedBase));
       }
       setManualSlug(true);
     } catch (err) {
@@ -201,11 +215,16 @@ export default function BlogFormPage() {
     if (!form.blog_slug.trim()) {
       newErrors.blog_slug = 'URL Slug is required.';
     }
+    const cleanDesc = (form.blog_description || '').replace(/<[^>]*>/g, '').trim();
+    if (!cleanDesc) {
+      newErrors.blog_description = 'Full Article Body / Description is required.';
+    }
     setErrors(newErrors);
 
-    if (newErrors.blog_title || newErrors.blog_slug) {
+    if (newErrors.blog_title || newErrors.blog_slug || newErrors.blog_description) {
       setActiveTab('general');
-      toast.error('Please fill in required fields.');
+      const firstMsg = newErrors.blog_title || newErrors.blog_slug || newErrors.blog_description;
+      toast.error(firstMsg);
       return false;
     }
     return true;
@@ -337,7 +356,7 @@ export default function BlogFormPage() {
                     : 'bg-[#FDF0F0] text-[#9A2D2D] border-[#F6C8C8]'
                 }`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${form.blog_status === 'Active' ? 'bg-[#1E6B34]' : 'bg-[#9A2D2D]'}`} />
-                  <span>{form.blog_status === 'Active' ? 'Published (Active)' : 'Draft (Inactive)'}</span>
+                  <span>{form.blog_status === 'Active' ? 'Active' : 'Inactive'}</span>
                 </span>
               </div>
             </div>
@@ -498,16 +517,22 @@ export default function BlogFormPage() {
                 {/* Rich text editor body */}
                 <div>
                   <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                    Full Article Body
+                    Full Article Body <span className="text-[#9A2D2D]">*</span>
                   </label>
                   <RichTextEditor
                     value={form.blog_description}
                     onChange={(htmlContent) => {
                       setForm((prev) => ({ ...prev, blog_description: htmlContent }));
+                      if (errors.blog_description) {
+                        setErrors((prev) => ({ ...prev, blog_description: false }));
+                      }
                     }}
                     placeholder="Write and format the full content of your article here..."
                     minHeight="350px"
                   />
+                  {errors.blog_description && (
+                    <p className="text-[11px] text-[#E05252] mt-1 font-medium">{errors.blog_description}</p>
+                  )}
                 </div>
 
                 <div className="flex justify-end pt-3">
@@ -560,7 +585,7 @@ export default function BlogFormPage() {
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-[#1A1817]">Upload Article Banner</p>
-                          <p className="text-xs text-[#8C8275] mt-1">Recommended size: 1200 x 630 px (PNG, JPG, WEBP)</p>
+                          <p className="text-xs text-[#8C8275] mt-1">Recommended size: 1200 x 630 px</p>
                         </div>
                       </div>
                     )}
@@ -627,21 +652,23 @@ export default function BlogFormPage() {
                   <p className="text-[11px] text-[#8C8275] mt-1">Comma-separated keywords for search engine indexing.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
-                      Publication Status
-                    </label>
-                    <select
-                      name="blog_status"
-                      value={form.blog_status}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs cursor-pointer"
-                    >
-                      <option value="Active">Active (Published live)</option>
-                      <option value="Inactive">Inactive (Draft / Hidden)</option>
-                    </select>
-                  </div>
+                <div className={isEditing ? 'grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1' : 'pt-1'}>
+                  {isEditing && (
+                    <div>
+                      <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
+                        Status
+                      </label>
+                      <select
+                        name="blog_status"
+                        value={form.blog_status || 'Active'}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs cursor-pointer"
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-semibold text-[#3D372E] mb-1.5">
@@ -653,8 +680,8 @@ export default function BlogFormPage() {
                       onChange={handleChange}
                       className="w-full px-4 py-2.5 text-sm rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] text-[#1A1817] focus:outline-none focus:border-[#C99C4B] focus:bg-white transition shadow-2xs cursor-pointer"
                     >
-                      <option value="1">Index (Visible to Google & Search)</option>
-                      <option value="0">No-Index (Hide from Google)</option>
+                      <option value="1">Index</option>
+                      <option value="0">No-Index</option>
                     </select>
                   </div>
                 </div>

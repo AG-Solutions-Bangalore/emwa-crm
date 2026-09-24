@@ -28,20 +28,25 @@ import {
   updateBlogStatus,
 } from '../services/blogApi';
 import { getActiveCategories } from '../services/categoryApi';
+import { getAssetBaseURL } from '../services/api';
+import { useAuthContext } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return String(dateStr);
-  return d.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch {
+    return String(dateStr);
+  }
 }
 
-function resolveImageUrl(url, baseUrl = 'https://easemarketing.in/emwaapi/public/assets/images/blog_images/') {
+function resolveImageUrl(url, baseUrl = getAssetBaseURL('/assets/images/blog_images/')) {
   if (!url) return null;
   if (url.startsWith('blob:') || url.startsWith('data:')) {
     return url;
@@ -59,14 +64,14 @@ function resolveImageUrl(url, baseUrl = 'https://easemarketing.in/emwaapi/public
 export default function BlogViewPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { isAdmin } = useAuthContext();
 
   const [blog, setBlog] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [togglingStatus, setTogglingStatus] = useState(false);
-  const [imageBaseUrl, setImageBaseUrl] = useState('https://easemarketing.in/emwaapi/public/assets/images/blog_images/');
+  const [imageBaseUrl, setImageBaseUrl] = useState(() => getAssetBaseURL('/assets/images/blog_images/'));
 
   const fetchBlogDetails = async () => {
     setLoading(true);
@@ -185,7 +190,7 @@ export default function BlogViewPage() {
 
   const title = blog.blog_title || blog.blog_meta_title || blog.title || blog.name || 'Untitled Article';
   const slug = blog.blog_slug || blog.slug || blog.url_slug || '—';
-  const rawImg = blog.blog_banner_image || blog.banner_image || blog.image || blog.banner_image_url;
+  const rawImg = blog.blog_banner_image || blog.banner_image || blog.image || blog.blog_image || blog.banner_image_url || blog.photo || blog.file_name;
   const image = resolveImageUrl(rawImg, imageBaseUrl);
   const status = blog.blog_status || blog.status || 'Active';
   const isActive = status === 'Active';
@@ -248,13 +253,15 @@ export default function BlogViewPage() {
                 <span>Edit Article</span>
               </button>
 
-              <button
-                onClick={() => setDeleteModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#F6C8C8] bg-[#FFF5F5] hover:bg-[#FBE4E4] text-xs font-semibold text-[#9A2D2D] transition shadow-2xs cursor-pointer"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>Delete</span>
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setDeleteModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#F6C8C8] bg-[#FFF5F5] hover:bg-[#FBE4E4] text-xs font-semibold text-[#9A2D2D] transition shadow-2xs cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -274,20 +281,6 @@ export default function BlogViewPage() {
                       <Tag className="h-3 w-3" />
                       <span>{categoryName}</span>
                     </span>
-
-                    {isFeatured && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-xs font-medium">
-                        <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
-                        <span>Featured</span>
-                      </span>
-                    )}
-
-                    {isFront && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-medium">
-                        <Home className="h-3 w-3 text-indigo-600" />
-                        <span>Homepage</span>
-                      </span>
-                    )}
                   </div>
 
                   {/* Status Toggle Button */}
@@ -305,7 +298,7 @@ export default function BlogViewPage() {
                     ) : (
                       <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-[#1E6B34]' : 'bg-[#9A2D2D]'}`} />
                     )}
-                    <span>{isActive ? 'Published (Active)' : 'Draft (Inactive)'}</span>
+                    <span>{isActive ? 'Active' : 'Inactive'}</span>
                   </button>
                 </div>
 
@@ -480,27 +473,6 @@ export default function BlogViewPage() {
                     </div>
                   </div>
                 )}
-              </div>
-
-              {/* Action shortcuts card */}
-              <div className="bg-white rounded-2xl border border-[#E8E3DA] p-5 shadow-2xs space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[#78716C]">
-                  Quick Actions
-                </h3>
-                <button
-                  onClick={() => navigate(`/blog/edit/${id}`)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#1A1817] hover:bg-[#2C2825] text-[#FAF8F5] text-xs font-semibold transition cursor-pointer shadow-xs"
-                >
-                  <Edit2 className="h-3.5 w-3.5 text-[#C99C4B]" />
-                  <span>Edit Article</span>
-                </button>
-
-                <button
-                  onClick={() => navigate('/blog/create')}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#E2DDD5] bg-[#FAF8F5] hover:bg-[#F2EFEB] text-xs font-semibold text-[#1A1817] transition cursor-pointer"
-                >
-                  <span>Create Another Article</span>
-                </button>
               </div>
 
             </div>

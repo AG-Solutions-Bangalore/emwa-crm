@@ -1,112 +1,55 @@
 import React from 'react';
-import { CKEditor } from '@ckeditor/ckeditor5-react';
-import {
-  ClassicEditor,
-  Bold,
-  Essentials,
-  Italic,
-  Paragraph,
-  Heading,
-  Link,
-  List,
-  Table,
-  TableToolbar,
-  BlockQuote,
-  GeneralHtmlSupport,
-  SourceEditing,
-  Alignment,
-  Font,
-  FontColor,
-  FontBackgroundColor,
-  FontSize,
-  HorizontalLine,
-  HtmlEmbed,
-} from 'ckeditor5';
-import 'ckeditor5/ckeditor5.css';
+import { CKEditor } from 'ckeditor4-react';
 
 export default function RichTextEditor({
   value = '',
   onChange,
   placeholder = 'Write content here...',
   minHeight = '220px',
+  height = 250,
 }) {
   return (
     <div
-      className="ckeditor-wrapper rounded-xl border border-[#E2DDD5] bg-white overflow-hidden text-[#1A1817] shadow-2xs"
+      className="ckeditor4-wrapper rounded-xl border border-[#E2DDD5] bg-white overflow-hidden text-[#1A1817] shadow-2xs"
       style={{ '--ck-min-height': minHeight }}
     >
       <CKEditor
-        editor={ClassicEditor}
-        config={{
-          licenseKey: 'GPL',
-          placeholder,
-          plugins: [
-            Essentials,
-            Paragraph,
-            Heading,
-            Bold,
-            Italic,
-            Link,
-            List,
-            Table,
-            TableToolbar,
-            BlockQuote,
-            GeneralHtmlSupport,
-            SourceEditing,
-            Alignment,
-            Font,
-            FontColor,
-            FontBackgroundColor,
-            FontSize,
-            HorizontalLine,
-            HtmlEmbed,
-          ],
-          toolbar: [
-            'undo',
-            'redo',
-            '|',
-            'heading',
-            '|',
-            'fontSize',
-            'fontColor',
-            'fontBackgroundColor',
-            '|',
-            'bold',
-            'italic',
-            'link',
-            '|',
-            'alignment',
-            'bulletedList',
-            'numberedList',
-            '|',
-            'insertTable',
-            'blockQuote',
-            'horizontalLine',
-            '|',
-            'sourceEditing',
-          ],
-          table: {
-            contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells'],
-          },
-          htmlSupport: {
-            allow: [
-              {
-                name: /.*/,
-                attributes: true,
-                classes: true,
-                styles: true,
-              },
-            ],
-          },
-        }}
+        initData={value || ''}
         data={value || ''}
-        onChange={(event, editor) => {
-          const data = editor.getData();
+        onBeforeLoad={(CKEDITOR) => {
+          if (CKEDITOR && CKEDITOR.config) {
+            CKEDITOR.config.versionCheck = false;
+          }
+        }}
+        onChange={(event) => {
+          const data = event.editor.getData();
           if (onChange) {
             onChange(data);
           }
+        }}
+        config={{
+          versionCheck: false,
+          extraPlugins: 'colorbutton,font,justify',
+          placeholder: placeholder,
+          height: height || 250,
+          toolbar: [
+            { name: 'document', items: ['Source', '-', 'Preview'] },
+            { name: 'clipboard', items: ['Cut', 'Copy', 'Paste', 'PasteText', 'PasteFromWord', '-', 'Undo', 'Redo'] },
+            { name: 'editing', items: ['Find', 'Replace', '-', 'SelectAll'] },
+            '/',
+            { name: 'basicstyles', items: ['Bold', 'Italic', 'Underline', 'Strike', 'Subscript', 'Superscript', '-', 'CopyFormatting', 'RemoveFormat'] },
+            { name: 'paragraph', items: ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent', '-', 'Blockquote', '-', 'JustifyLeft', 'JustifyCenter', 'JustifyRight', 'JustifyBlock'] },
+            { name: 'links', items: ['Link', 'Unlink', 'Anchor'] },
+            { name: 'insert', items: ['Image', 'Table', 'HorizontalRule', 'SpecialChar'] },
+            '/',
+            { name: 'styles', items: ['Styles', 'Format', 'Font', 'FontSize'] },
+            { name: 'colors', items: ['TextColor', 'BGColor'] },
+            { name: 'tools', items: ['Maximize', 'ShowBlocks'] },
+          ],
+          removeButtons: '',
         }}
       />
     </div>
   );
 }
+
